@@ -9,7 +9,14 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
 # Page configuration
-st.set_page_config(page_title="Student Dropout Prediction", page_icon=":school:", layout="wide")
+st.set_page_config(page_title="Student Dropout Prediction", page_icon="🎓", layout="wide")
+
+# Create a mapping dictionary for target labels to ensure consistency
+TARGET_MAPPING = {
+    'Graduate': 1,
+    'Dropout': 0,
+    'Enrolled': 2  # In case this label exists in some datasets
+}
 
 
 def display_dataframe_info(df):
@@ -29,7 +36,7 @@ def display_dataframe_info(df):
     st.subheader("Column Information")
     column_info = pd.DataFrame({
         'Column Name': df.columns,
-        'Data Type': df.dtypes,
+        'Data Type': df.dtypes.astype(str),  # Convert to string to avoid Arrow conversion issues
         'Non-Null Count': df.count(),
         'Null Count': df.isnull().sum(),
         'Null Percentage': (df.isnull().sum() / len(df) * 100).round(2)
@@ -117,39 +124,84 @@ def load_data(uploaded_file=None):
 
 
 def preprocess_data(df):
-    """Preprocess the data for model training"""
-    # Drop student ID
-    if 'id' in df.columns:
-        df = df.drop('id', axis=1)
+    """Preprocess the data for model training with consistent target encoding"""
+    # Make a copy to avoid overwriting original data
+    processed_df = df.copy()
+
+    # Drop student ID if present
+    if 'id' in processed_df.columns:
+        processed_df = processed_df.drop('id', axis=1)
+
+    # Log information about target values
+    st.write("Target values found:", processed_df['Target'].unique().tolist())
 
     # Handle missing values
-    df = df.fillna(df.median(numeric_only=True))
+    processed_df = processed_df.fillna(processed_df.median(numeric_only=True))
 
-    # Encode categorical variables including Target
+    # Encode categorical variables
     le = LabelEncoder()
-    categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
+    categorical_cols = processed_df.select_dtypes(include=['object']).columns.tolist()
+    categorical_cols = [col for col in categorical_cols if col != 'Target']  # Exclude Target
 
     for col in categorical_cols:
-        df[col] = le.fit_transform(df[col])
+        processed_df[col] = le.fit_transform(processed_df[col])
+
+    # Special handling for Target column to ensure consistent encoding
+    if 'Target' in processed_df.columns:
+        # Create a mapping table to show the encoding
+        target_mapping_df = pd.DataFrame({
+            'Original': list(TARGET_MAPPING.keys()),
+            'Encoded': list(TARGET_MAPPING.values())
+        })
+
+        # Display the mapping
+        with st.expander("Target Label Encoding"):
+            st.dataframe(target_mapping_df)
+
+        # Apply the fixed encoding
+        processed_df['Target'] = processed_df['Target'].map(TARGET_MAPPING)
+        processed_df['Target'] = processed_df['Target'].fillna(0)  # Default to 'Dropout' for any unknown values
 
     # Ensure all columns are numeric
-    for col in df.columns:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
+    for col in processed_df.columns:
+        processed_df[col] = pd.to_numeric(processed_df[col], errors='coerce')
 
     # Drop any rows with NaN values after conversion
-    df.dropna(inplace=True)
+    processed_df.dropna(inplace=True)
 
     # Prepare features and target
-    X = df.drop('Target', axis=1)
-    y = df['Target']
+    X = processed_df.drop('Target', axis=1)
+    y = processed_df['Target']
 
-    return X, y, df
+    return X, y, processed_df
 
 
 def train_model(X_train, y_train):
-    """Train a Random Forest Classifier"""
-    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    """Train a Random Forest Classifier with robust parameters"""
+    # Create a progress bar
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+
+    status_text.text("Starting model training...")
+
+    # Use more trees and handle class imbalance
+    model = RandomForestClassifier(
+        n_estimators=200,
+        max_depth=None,
+        min_samples_split=5,
+        min_samples_leaf=2,
+        class_weight='balanced',
+        random_state=42,
+        n_jobs=-1  # Use all available cores for faster training
+    )
+
+    status_text.text("Fitting the model...")
+    progress_bar.progress(25)
+
     model.fit(X_train, y_train)
+
+    progress_bar.progress(100)
+    status_text.text("Model training complete!")
 
     return model
 
@@ -162,6 +214,18 @@ def individual_dropout_prediction(model, X):
         X: Feature DataFrame used for training
     """
     st.subheader("Student Dropout Probability Predictor")
+
+    # Optional debug mode
+    show_debug = st.checkbox("Show debug information")
+
+    # Show model information if debug mode is on
+    if show_debug:
+        st.subheader("Model Information")
+        st.write("Model Classes:", model.classes_)
+
+        # Map numeric classes back to labels
+        reverse_mapping = {v: k for k, v in TARGET_MAPPING.items()}
+        st.write("Class mapping:", {f"Class {k}": reverse_mapping.get(k, f"Unknown-{k}") for k in model.classes_})
 
     # Create columns for better layout
     col1, col2, col3 = st.columns(3)
@@ -185,285 +249,212 @@ def individual_dropout_prediction(model, X):
         course = st.number_input("Course Code", min_value=9000, max_value=9999, value=9238)
         attendance = st.selectbox("Daytime/evening attendance", [0, 1])
         prev_qualification = st.selectbox("Previous qualification", list(range(1, 18)))
-        prev_grade = st.slider("Previous qualification grade", min_value=0.0, max_value=200.0, value=120.0, step=0.1)
-        admission_grade = st.slider("Admission grade", min_value=0.0, max_value=200.0, value=120.0, step=0.1)
+        prev_grade = st.slider("Previous qualification grade", min_value=0.0, max_value=200.0, value=120.0, step=5.0)
+        admission_grade = st.slider("Admission grade", min_value=0.0, max_value=200.0, value=120.0, step=5.0)
 
-    # Family & Financial
+    # Academic Performance - Most important features
     with col3:
-        st.markdown("### Family & Financial")
-        mother_qual = st.selectbox("Mother's qualification", list(range(1, 35)))
-        father_qual = st.selectbox("Father's qualification", list(range(1, 35)))
-        mother_occ = st.selectbox("Mother's occupation", list(range(1, 46)))
-        father_occ = st.selectbox("Father's occupation", list(range(1, 46)))
-        debtor = st.selectbox("Debtor", [0, 1])
-        tuition_up_to_date = st.selectbox("Tuition fees up to date", [0, 1])
-
-    # Academic Performance
-    st.markdown("### Academic Performance")
-    col4, col5 = st.columns(2)
-
-    with col4:
-        st.markdown("#### 1st Semester")
-        units_1st_credited = st.slider("Units credited (1st sem)", min_value=0, max_value=20, value=0)
-        units_1st_enrolled = st.slider("Units enrolled (1st sem)", min_value=0, max_value=20, value=6)
-        units_1st_evaluations = st.slider("Units evaluations (1st sem)", min_value=0, max_value=20, value=6)
+        st.markdown("### Academic Performance")
         units_1st_approved = st.slider("Units approved (1st sem)", min_value=0, max_value=20, value=5)
-        units_1st_grade = st.slider("Average grade (1st sem)", min_value=0.0, max_value=20.0, value=12.0, step=0.1)
-        units_1st_without_eval = st.slider("Units without evaluations (1st sem)", min_value=0, max_value=20, value=0)
-
-    with col5:
-        st.markdown("#### 2nd Semester")
-        units_2nd_credited = st.slider("Units credited (2nd sem)", min_value=0, max_value=20, value=0)
-        units_2nd_enrolled = st.slider("Units enrolled (2nd sem)", min_value=0, max_value=20, value=6)
-        units_2nd_evaluations = st.slider("Units evaluations (2nd sem)", min_value=0, max_value=20, value=6)
+        units_1st_grade = st.slider("Average grade (1st sem)", min_value=0.0, max_value=20.0, value=12.0, step=1.0)
         units_2nd_approved = st.slider("Units approved (2nd sem)", min_value=0, max_value=20, value=5)
-        units_2nd_grade = st.slider("Average grade (2nd sem)", min_value=0.0, max_value=20.0, value=12.0, step=0.1)
-        units_2nd_without_eval = st.slider("Units without evaluations (2nd sem)", min_value=0, max_value=20, value=0)
+        units_2nd_grade = st.slider("Average grade (2nd sem)", min_value=0.0, max_value=20.0, value=12.0, step=1.0)
 
     # Economic Indicators
     st.markdown("### Economic Indicators")
     eco_col1, eco_col2, eco_col3 = st.columns(3)
-
     with eco_col1:
-        unemployment = st.slider("Unemployment rate", min_value=0.0, max_value=20.0, value=11.0, step=0.1)
-
+        unemployment = st.slider("Unemployment rate", min_value=0.0, max_value=20.0, value=11.0, step=1.0)
     with eco_col2:
-        inflation = st.slider("Inflation rate", min_value=-2.0, max_value=5.0, value=0.6, step=0.1)
-
+        inflation = st.slider("Inflation rate", min_value=-2.0, max_value=5.0, value=0.6, step=0.5)
     with eco_col3:
-        gdp = st.slider("GDP", min_value=-5.0, max_value=5.0, value=2.0, step=0.01)
+        gdp = st.slider("GDP", min_value=-5.0, max_value=5.0, value=2.0, step=0.5)
 
-    # Add debug information option
-    show_debug = st.checkbox("Show debug information")
+    # Create default values for remaining features
+    default_values = {
+        'Mother\'s qualification': 10,
+        'Father\'s qualification': 10,
+        'Mother\'s occupation': 5,
+        'Father\'s occupation': 5,
+        'Debtor': 0,
+        'Tuition fees up to date': 1,
+        'Nacionality': 1,
+        'Curricular units 1st sem (credited)': 0,
+        'Curricular units 1st sem (enrolled)': 6,
+        'Curricular units 1st sem (evaluations)': 6,
+        'Curricular units 1st sem (without evaluations)': 0,
+        'Curricular units 2nd sem (credited)': 0,
+        'Curricular units 2nd sem (enrolled)': 6,
+        'Curricular units 2nd sem (evaluations)': 6,
+        'Curricular units 2nd sem (without evaluations)': 0,
+    }
+
+    # Show advanced options toggle
+    show_advanced = st.checkbox("Show advanced options")
+    if show_advanced:
+        st.markdown("### Advanced Features")
+        col_adv1, col_adv2 = st.columns(2)
+
+        with col_adv1:
+            for key in list(default_values.keys())[:len(default_values) // 2]:
+                if key in ['Nacionality', 'Debtor', 'Tuition fees up to date']:
+                    default_values[key] = st.selectbox(key, [0, 1], index=default_values[key])
+                else:
+                    default_values[key] = st.number_input(key, value=default_values[key])
+
+        with col_adv2:
+            for key in list(default_values.keys())[len(default_values) // 2:]:
+                default_values[key] = st.number_input(key, value=default_values[key])
 
     # Prediction button
     if st.button("Predict Dropout Probability"):
-        # Create input data dictionary using raw values (no text conversion needed)
-        input_dict = {
-            'Marital status': marital_status,
-            'Application mode': application_mode,
-            'Application order': application_order,
-            'Course': course,
-            'Daytime/evening attendance': attendance,
-            'Previous qualification': prev_qualification,
-            'Previous qualification (grade)': prev_grade,
-            'Nacionality': 1,  # Default value
-            'Mother\'s qualification': mother_qual,
-            'Father\'s qualification': father_qual,
-            'Mother\'s occupation': mother_occ,
-            'Father\'s occupation': father_occ,
-            'Admission grade': admission_grade,
-            'Displaced': displaced,
-            'Educational special needs': educational_needs,
-            'Debtor': debtor,
-            'Tuition fees up to date': tuition_up_to_date,
-            'Gender': 1 if gender == "Male" else 0,
-            'Scholarship holder': scholarship,
-            'Age at enrollment': age,
-            'International': international,
-            'Curricular units 1st sem (credited)': units_1st_credited,
-            'Curricular units 1st sem (enrolled)': units_1st_enrolled,
-            'Curricular units 1st sem (evaluations)': units_1st_evaluations,
-            'Curricular units 1st sem (approved)': units_1st_approved,
-            'Curricular units 1st sem (grade)': units_1st_grade,
-            'Curricular units 1st sem (without evaluations)': units_1st_without_eval,
-            'Curricular units 2nd sem (credited)': units_2nd_credited,
-            'Curricular units 2nd sem (enrolled)': units_2nd_enrolled,
-            'Curricular units 2nd sem (evaluations)': units_2nd_evaluations,
-            'Curricular units 2nd sem (approved)': units_2nd_approved,
-            'Curricular units 2nd sem (grade)': units_2nd_grade,
-            'Curricular units 2nd sem (without evaluations)': units_2nd_without_eval,
-            'Unemployment rate': unemployment,
-            'Inflation rate': inflation,
-            'GDP': gdp
-        }
+        # Create a spinner to show progress
+        with st.spinner('Calculating prediction...'):
+            # Create input data dictionary
+            input_dict = {
+                'Marital status': marital_status,
+                'Application mode': application_mode,
+                'Application order': application_order,
+                'Course': course,
+                'Daytime/evening attendance': attendance,
+                'Previous qualification': prev_qualification,
+                'Previous qualification (grade)': prev_grade,
+                'Admission grade': admission_grade,
+                'Displaced': displaced,
+                'Educational special needs': educational_needs,
+                'Gender': 1 if gender == "Male" else 0,
+                'Scholarship holder': scholarship,
+                'Age at enrollment': age,
+                'International': international,
+                'Curricular units 1st sem (approved)': units_1st_approved,
+                'Curricular units 1st sem (grade)': units_1st_grade,
+                'Curricular units 2nd sem (approved)': units_2nd_approved,
+                'Curricular units 2nd sem (grade)': units_2nd_grade,
+                'Unemployment rate': unemployment,
+                'Inflation rate': inflation,
+                'GDP': gdp
+            }
 
-        # Create DataFrame from dictionary
-        input_data = pd.DataFrame([input_dict])
+            # Add the default values
+            for key, value in default_values.items():
+                input_dict[key] = value
 
-        # Show debug information if requested
-        if show_debug:
-            st.subheader("Debug Information")
-            st.write("Input Data:")
-            st.write(input_data)
-            st.write("Model Classes:", model.classes_)
-            st.write("Training Data Sample:")
-            st.write(X.head())
-            st.write("Input Data Shape:", input_data.shape)
-            st.write("Training Data Shape:", X.shape)
-            st.write("Input Data Columns:", input_data.columns.tolist())
-            st.write("Training Data Columns:", X.columns.tolist())
+            # Create DataFrame from dictionary
+            input_data = pd.DataFrame([input_dict])
 
-        # Ensure matching columns by using the training feature names
-        try:
-            # Add any missing columns from training data
-            for col in X.columns:
-                if col not in input_data.columns:
-                    input_data[col] = 0
+            # Show debug information
+            if show_debug:
+                st.subheader("Debug Information")
+                st.write("Raw Input Data:")
+                st.write(input_data)
 
-            # Keep only columns that exist in training data
-            input_data = input_data[X.columns]
-
-            # Make prediction
-            dropout_prob = model.predict_proba(input_data)
-
-            # Get class names - assuming they might be encoded
-            class_names = []
-            for i in range(len(model.classes_)):
-                if i == 0:
-                    class_names.append("Dropout")
-                elif i == 1:
-                    if len(model.classes_) == 2:
-                        class_names.append("Graduate")  # Binary case: 0=Dropout, 1=Graduate
-                    else:
-                        class_names.append("Enrolled")  # Multi-class case
-                elif i == 2:
-                    class_names.append("Graduate")
-                else:
-                    class_names.append(f"Class {i}")
-
-            # Create results dataframe for display
-            results = pd.DataFrame({
-                'Outcome': class_names,
-                'Probability': [f"{p * 100:.2f}%" for p in dropout_prob[0]],
-                'Raw Probability': dropout_prob[0]
-            })
-
-            # Display results
-            st.subheader("Prediction Results")
-            st.dataframe(results[['Outcome', 'Probability']])
-
-            # Show progress bars
-            for i, (outcome, prob) in enumerate(zip(class_names, dropout_prob[0])):
-                st.write(f"{outcome}:")
-                st.progress(float(prob))
-
-            # Highlight prediction and provide guidance
-            max_class_idx = np.argmax(dropout_prob[0])
-            max_class_name = class_names[max_class_idx]
-            max_prob = dropout_prob[0][max_class_idx]
-
-            st.subheader("Prediction Summary")
-            if max_class_name == "Dropout":
-                st.warning(f"⚠️ High risk of student dropout! Probability: {max_prob * 100:.2f}%")
-                st.write("Recommended actions:")
-                st.write("- Schedule academic counseling")
-                st.write("- Review financial aid options")
-                st.write("- Consider tutoring or additional support")
-            elif max_class_name == "Enrolled":
-                st.info(f"ℹ️ Student likely to remain enrolled. Probability: {max_prob * 100:.2f}%")
-                st.write("Recommended actions:")
-                st.write("- Continue regular academic monitoring")
-                st.write("- Check in periodically on academic progress")
-            else:  # Graduate
-                st.success(f"✅ Student shows strong graduation potential! Probability: {max_prob * 100:.2f}%")
-                st.write("Recommended actions:")
-                st.write("- Encourage continued excellence")
-                st.write("- Consider mentorship opportunities")
-
-        except Exception as e:
-            st.error(f"Prediction error: {e}")
-            st.info("Try adjusting the input values or check the debug information for clues.")
-
-def main():
-    st.title("🎓 Student Dropout Prediction Dashboard")
-
-    # Sidebar for navigation
-    menu = ["Data Overview", "Exploratory Data Analysis", "Model Training", "Dropout Prediction"]
-    choice = st.sidebar.selectbox("Select Module", menu)
-
-    # File upload
-    uploaded_file = st.sidebar.file_uploader("Upload your Student Dropout CSV", type=['csv'])
-
-    # Load data
-    df = load_data(uploaded_file)
-
-    # Preprocess data
-    X, y, full_df = preprocess_data(df)
-
-    # Store the model as a session state variable to persist across reruns
-    if 'model' not in st.session_state:
-        # Split data
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        # Train model
-        st.session_state.model = train_model(X_train, y_train)
-
-    if choice == "Data Overview":
-        display_dataframe_info(df)
-
-    elif choice == "Exploratory Data Analysis":
-        st.header("Exploratory Data Analysis")
-
-        # Numerical Features Distribution
-        st.subheader("Numerical Features Distribution")
-        numerical_features = ['Age at enrollment', 'Admission grade', 'Curricular units 1st sem (grade)']
-        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-        for i, feature in enumerate(numerical_features):
             try:
-                sns.histplot(full_df[feature], kde=True, ax=axes[i])
-                axes[i].set_title(f'Distribution of {feature}')
-            except:
-                axes[i].text(0.5, 0.5, f"Error plotting {feature}", ha='center')
-        plt.tight_layout()
-        st.pyplot(fig)
+                # Ensure input data has the same columns and types as training data
+                for col in X.columns:
+                    if col not in input_data.columns:
+                        input_data[col] = X[col].median()
 
-        # Correlation Heatmap
-        st.subheader("Correlation Heatmap")
-        try:
-            correlation_features = ['Age at enrollment', 'Admission grade', 'Curricular units 1st sem (grade)',
-                                    'Curricular units 2nd sem (grade)', 'Unemployment rate', 'Inflation rate', 'GDP']
-            correlation_matrix = full_df[correlation_features].corr()
-            fig, ax = plt.subplots(figsize=(10, 8))
-            sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', ax=ax)
-            st.pyplot(fig)
-        except:
-            st.error("Could not generate correlation heatmap with the current data.")
+                # Keep only columns from training data and ensure same order
+                input_data = input_data[X.columns]
 
-        # Dropout Rate
-        st.subheader("Student Outcome Distribution")
-        try:
-            outcome_count = full_df['Target'].value_counts()
-            fig, ax = plt.subplots(figsize=(8, 6))
-            sns.barplot(x=outcome_count.index, y=outcome_count.values, ax=ax)
-            ax.set_title('Student Outcome Distribution')
-            ax.set_ylabel('Count')
-            ax.set_xlabel('Target')
-            st.pyplot(fig)
-        except:
-            st.error("Could not generate outcome distribution with the current data.")
+                # Get prediction probabilities
+                prediction_probs = model.predict_proba(input_data)[0]
 
-    elif choice == "Model Training":
-        st.header("Model Training")
+                # Map class indices to human-readable labels
+                reverse_mapping = {v: k for k, v in TARGET_MAPPING.items()}
+                class_names = [reverse_mapping.get(i, f"Class {i}") for i in model.classes_]
 
-        # Split data
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+                # Create results dataframe
+                results = pd.DataFrame({
+                    'Outcome': class_names,
+                    'Probability': [f"{p * 100:.2f}%" for p in prediction_probs],
+                    'Raw Value': prediction_probs
+                })
 
-        # Train model
-        model = train_model(X_train, y_train)
+                # Display results
+                st.subheader("Prediction Results")
+                st.dataframe(results)
 
-        # Model evaluation
-        y_pred = model.predict(X_test)
+                # Show probability bars
+                for outcome, prob in zip(class_names, prediction_probs):
+                    st.write(f"{outcome}: {prob:.2%}")
+                    st.progress(float(prob))
 
-        st.subheader("Model Performance")
-        st.write("Accuracy:", accuracy_score(y_test, y_pred))
+                # Highlight most likely outcome
+                max_class_idx = np.argmax(prediction_probs)
+                max_class_name = class_names[max_class_idx]
+                max_prob = prediction_probs[max_class_idx]
 
+                st.subheader("Prediction Summary")
+
+                if max_class_name == "Dropout":
+                    st.warning(f"⚠️ Risk of student dropout detected! Probability: {max_prob:.2%}")
+                    st.write("Recommended actions:")
+                    st.write("- Schedule academic counseling")
+                    st.write("- Review financial aid options")
+                    st.write("- Consider tutoring or additional support")
+                else:  # Graduate or Enrolled
+                    st.success(f"✅ Student likely to succeed! Probability of {max_class_name}: {max_prob:.2%}")
+                    st.write("Recommended actions:")
+                    st.write("- Continue regular monitoring")
+                    st.write("- Provide ongoing encouragement and support")
+
+            except Exception as e:
+                st.error(f"Prediction error: {str(e)}")
+
+                # Show detailed error information in debug mode
+                if show_debug:
+                    import traceback
+                    st.code(traceback.format_exc())
+
+
+def visualize_model_results(model, X_test, y_test):
+    """Visualize model evaluation results"""
+    # Get predictions
+    y_pred = model.predict(X_test)
+    y_proba = model.predict_proba(X_test)
+
+    # Get accuracy
+    accuracy = accuracy_score(y_test, y_pred)
+
+    # Display accuracy with a metric
+    st.metric("Model Accuracy", f"{accuracy:.2%}")
+
+    # Create tabs for different visualizations
+    tabs = st.tabs(["Classification Report", "Confusion Matrix", "Feature Importance"])
+
+    with tabs[0]:
         # Classification Report
-        st.text("Classification Report:")
-        st.text(classification_report(y_test, y_pred))
+        st.subheader("Classification Report")
+        report = classification_report(y_test, y_pred, output_dict=True)
+        report_df = pd.DataFrame(report).transpose()
+        st.dataframe(report_df)
 
+    with tabs[1]:
         # Confusion Matrix
+        st.subheader("Confusion Matrix")
         cm = confusion_matrix(y_test, y_pred)
+
         fig, ax = plt.subplots(figsize=(8, 6))
         sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
+
+        # Map numeric classes to labels
+        reverse_mapping = {v: k for k, v in TARGET_MAPPING.items()}
+        class_labels = [reverse_mapping.get(c, f"Class {c}") for c in sorted(np.unique(y_test))]
+
         ax.set_title('Confusion Matrix')
         ax.set_ylabel('Actual')
         ax.set_xlabel('Predicted')
+        ax.set_xticklabels(class_labels)
+        ax.set_yticklabels(class_labels)
         st.pyplot(fig)
 
+    with tabs[2]:
         # Feature Importance
         st.subheader("Feature Importance")
+
         feature_importance = pd.DataFrame({
-            'Feature': X.columns,
+            'Feature': X_test.columns,
             'Importance': model.feature_importances_
         }).sort_values('Importance', ascending=False)
 
@@ -474,9 +465,150 @@ def main():
         plt.tight_layout()
         st.pyplot(fig)
 
-    elif choice == "Dropout Prediction":
-        # Call the individual prediction function
-        individual_dropout_prediction(st.session_state.model, X)
+
+def main():
+    st.title("🎓 Student Dropout Prediction Dashboard")
+    st.markdown("""
+    This dashboard helps predict and analyze factors that lead to student dropout.
+    Upload your data or use our sample dataset to explore this critical educational issue.
+    """)
+
+    # Initialize session state variables if they don't exist
+    if 'model_trained' not in st.session_state:
+        st.session_state.model_trained = False
+
+    if 'show_prediction' not in st.session_state:
+        st.session_state.show_prediction = False
+
+    # Sidebar for navigation
+    st.sidebar.title("Navigation")
+    menu = ["Data Overview", "Exploratory Data Analysis", "Model Training & Evaluation", "Dropout Prediction"]
+    choice = st.sidebar.radio("Select Module", menu)
+
+    # File upload
+    st.sidebar.header("Data Input")
+    uploaded_file = st.sidebar.file_uploader("Upload your Student Dropout CSV", type=['csv'])
+
+    # Load data
+    df = load_data(uploaded_file)
+
+    # Preprocess data
+    X, y, processed_df = preprocess_data(df)
+
+    # Split data once for consistency
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # Handle different menu choices
+    if choice == "Data Overview":
+        display_dataframe_info(df)
+
+    elif choice == "Exploratory Data Analysis":
+        st.header("Exploratory Data Analysis")
+
+        # Create tabs for different visualizations
+        tabs = st.tabs(["Distribution Analysis", "Correlation Analysis", "Outcome Analysis"])
+
+        with tabs[0]:
+            st.subheader("Feature Distributions")
+
+            # Select columns to visualize
+            numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
+            selected_columns = st.multiselect(
+                "Select features to visualize",
+                options=numeric_cols,
+                default=['Age at enrollment', 'Admission grade', 'Curricular units 1st sem (grade)']
+            )
+
+            if selected_columns:
+                for column in selected_columns:
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    sns.histplot(df[column], kde=True, ax=ax)
+                    ax.set_title(f'Distribution of {column}')
+                    st.pyplot(fig)
+            else:
+                st.info("Please select at least one column to visualize")
+
+        with tabs[1]:
+            st.subheader("Correlation Analysis")
+
+            # Select columns for correlation
+            correlation_features = st.multiselect(
+                "Select features for correlation analysis",
+                options=numeric_cols,
+                default=['Age at enrollment', 'Admission grade', 'Curricular units 1st sem (grade)',
+                         'Curricular units 2nd sem (grade)', 'Unemployment rate']
+            )
+
+            if len(correlation_features) > 1:
+                correlation_matrix = df[correlation_features].corr()
+                fig, ax = plt.subplots(figsize=(10, 8))
+                sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', ax=ax)
+                st.pyplot(fig)
+            else:
+                st.info("Please select at least two features for correlation analysis")
+
+        with tabs[2]:
+            st.subheader("Student Outcome Analysis")
+
+            # Simple count plot of target variable
+            fig, ax = plt.subplots(figsize=(8, 6))
+            target_counts = df['Target'].value_counts().reset_index()
+            target_counts.columns = ['Outcome', 'Count']
+            sns.barplot(x='Outcome', y='Count', data=target_counts, ax=ax)
+            ax.set_title('Distribution of Student Outcomes')
+            st.pyplot(fig)
+
+            # Target distribution by key factors
+            factor_cols = st.multiselect(
+                "Select factors to analyze against outcomes",
+                options=['Gender', 'Scholarship holder', 'Displaced', 'International'],
+                default=['Gender', 'Scholarship holder']
+            )
+
+            if factor_cols:
+                for col in factor_cols:
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    # Convert to numeric for consistency in crosstab
+                    cross_tab = pd.crosstab(df[col], df['Target'])
+                    cross_tab.plot(kind='bar', stacked=True, ax=ax)
+                    ax.set_title(f'Outcome Distribution by {col}')
+                    ax.set_ylabel('Count')
+                    ax.legend(title='Outcome')
+                    st.pyplot(fig)
+
+    elif choice == "Model Training & Evaluation":
+        st.header("Model Training & Evaluation")
+
+        # Train model button
+        if st.button("Train Model") or st.session_state.model_trained:
+            # Train the model
+            model = train_model(X_train, y_train)
+
+            # Store model in session state
+            st.session_state.model = model
+            st.session_state.model_trained = True
+
+            # Visualize results
+            visualize_model_results(model, X_test, y_test)
+
+            # Option to proceed to prediction
+            if st.button("Proceed to Student Dropout Prediction"):
+                st.session_state.show_prediction = True
+                st.experimental_rerun()
+        else:
+            st.info("Click 'Train Model' to start the training process")
+
+    elif choice == "Dropout Prediction" or st.session_state.show_prediction:
+        st.header("Student Dropout Prediction")
+
+        # Check if model exists in session state
+        if 'model' in st.session_state:
+            individual_dropout_prediction(st.session_state.model, X)
+        else:
+            st.warning("Please train the model first!")
+            if st.button("Go to Model Training"):
+                st.session_state.show_prediction = False
+                st.experimental_rerun()
 
 
 if __name__ == "__main__":
