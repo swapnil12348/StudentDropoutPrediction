@@ -7,6 +7,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # Page configuration
 st.set_page_config(page_title="Student Dropout Prediction", page_icon="🎓", layout="wide")
@@ -19,33 +22,295 @@ TARGET_MAPPING = {
 }
 
 
-def display_dataframe_info(df):
-    """Display comprehensive dataframe information in Streamlit"""
-    st.header("Data Overview")
+# Fix for the styled dataframe (around line 213)
+def display_enhanced_dataframe_info(df):
+    """Display enhanced and insightful dataframe information"""
+    st.header("📊 Data Overview & Insights")
 
-    # Dataset basic information
-    st.subheader("Dataset Dimensions")
-    st.write(f"Number of Rows: {df.shape[0]}")
-    st.write(f"Number of Columns: {df.shape[1]}")
+    # Key metrics at the top
+    col1, col2, col3, col4 = st.columns(4)
 
-    # Display first few rows
-    st.subheader("First Few Rows")
-    st.dataframe(df.head())
+    with col1:
+        st.metric("Total Students", f"{df.shape[0]:,}")
 
-    # Column information
-    st.subheader("Column Information")
-    column_info = pd.DataFrame({
-        'Column Name': df.columns,
-        'Data Type': df.dtypes.astype(str),  # Convert to string to avoid Arrow conversion issues
-        'Non-Null Count': df.count(),
-        'Null Count': df.isnull().sum(),
-        'Null Percentage': (df.isnull().sum() / len(df) * 100).round(2)
-    })
-    st.dataframe(column_info)
+    with col2:
+        dropout_rate = (df['Target'] == 'Dropout').sum() / len(df) * 100
+        st.metric("Dropout Rate", f"{dropout_rate:.1f}%")
 
-    # Basic statistics for numeric columns
-    st.subheader("Numeric Columns Statistics")
-    st.dataframe(df.describe())
+    with col3:
+        graduate_rate = (df['Target'] == 'Graduate').sum() / len(df) * 100
+        st.metric("Graduate Rate", f"{graduate_rate:.1f}%")
+
+    with col4:
+        missing_data_pct = df.isnull().sum().sum() / (df.shape[0] * df.shape[1]) * 100
+        st.metric("Missing Data", f"{missing_data_pct:.1f}%")
+
+    # Data Quality Overview
+    st.subheader("🔍 Data Quality Assessment")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # Missing data visualization
+        missing_data = df.isnull().sum()
+        missing_data = missing_data[missing_data > 0].sort_values(ascending=False)
+
+        if len(missing_data) > 0:
+            fig, ax = plt.subplots(figsize=(10, 6))
+            missing_data.plot(kind='bar', ax=ax, color='coral')
+            ax.set_title('Missing Data by Column')
+            ax.set_ylabel('Number of Missing Values')
+            ax.set_xlabel('Columns')
+            plt.xticks(rotation=45, ha='right')
+            plt.tight_layout()
+            st.pyplot(fig)
+        else:
+            st.success("✅ No missing data found!")
+
+    with col2:
+        # Data types distribution
+        dtype_counts = df.dtypes.value_counts()
+        fig, ax = plt.subplots(figsize=(8, 6))
+        colors = ['skyblue', 'lightcoral', 'lightgreen', 'gold']
+        dtype_counts.plot(kind='pie', ax=ax, autopct='%1.1f%%', colors=colors[:len(dtype_counts)])
+        ax.set_title('Distribution of Data Types')
+        ax.set_ylabel('')
+        st.pyplot(fig)
+
+    # Student Demographics Insights
+    st.subheader("👥 Student Demographics Insights")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        # Age distribution
+        if 'Age at enrollment' in df.columns:
+            fig, ax = plt.subplots(figsize=(8, 6))
+            df['Age at enrollment'].hist(bins=20, ax=ax, color='lightblue', alpha=0.7, edgecolor='black')
+            ax.axvline(df['Age at enrollment'].mean(), color='red', linestyle='--',
+                       label=f'Mean: {df["Age at enrollment"].mean():.1f}')
+            ax.set_title('Age Distribution at Enrollment')
+            ax.set_xlabel('Age')
+            ax.set_ylabel('Frequency')
+            ax.legend()
+            st.pyplot(fig)
+
+    with col2:
+        # Gender distribution
+        if 'Gender' in df.columns:
+            gender_counts = df['Gender'].value_counts()
+            gender_labels = ['Female' if x == 0 else 'Male' for x in gender_counts.index]
+
+            fig, ax = plt.subplots(figsize=(8, 6))
+            ax.pie(gender_counts.values, labels=gender_labels, autopct='%1.1f%%',
+                   colors=['pink', 'lightblue'])
+            ax.set_title('Gender Distribution')
+            st.pyplot(fig)
+
+    with col3:
+        # Scholarship distribution
+        if 'Scholarship holder' in df.columns:
+            scholarship_counts = df['Scholarship holder'].value_counts()
+            scholarship_labels = ['No Scholarship' if x == 0 else 'Scholarship' for x in scholarship_counts.index]
+
+            fig, ax = plt.subplots(figsize=(8, 6))
+            ax.pie(scholarship_counts.values, labels=scholarship_labels, autopct='%1.1f%%',
+                   colors=['lightcoral', 'lightgreen'])
+            ax.set_title('Scholarship Distribution')
+            st.pyplot(fig)
+
+    # Academic Performance Overview
+    st.subheader("📚 Academic Performance Overview")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # Admission grades distribution by outcome
+        if 'Admission grade' in df.columns:
+            fig, ax = plt.subplots(figsize=(10, 6))
+            for outcome in df['Target'].unique():
+                subset = df[df['Target'] == outcome]['Admission grade']
+                ax.hist(subset, alpha=0.7, label=outcome, bins=20)
+            ax.set_title('Admission Grade Distribution by Outcome')
+            ax.set_xlabel('Admission Grade')
+            ax.set_ylabel('Frequency')
+            ax.legend()
+            st.pyplot(fig)
+
+    with col2:
+        # First semester performance
+        if 'Curricular units 1st sem (grade)' in df.columns:
+            fig, ax = plt.subplots(figsize=(10, 6))
+            for outcome in df['Target'].unique():
+                subset = df[df['Target'] == outcome]['Curricular units 1st sem (grade)']
+                ax.hist(subset, alpha=0.7, label=outcome, bins=20)
+            ax.set_title('1st Semester Grade Distribution by Outcome')
+            ax.set_xlabel('Average Grade')
+            ax.set_ylabel('Frequency')
+            ax.legend()
+            st.pyplot(fig)
+
+    # Key Risk Factors Analysis
+    st.subheader("⚠️ Key Risk Factors Analysis")
+
+    risk_factors = []
+
+    # Calculate various risk indicators
+    if 'Curricular units 1st sem (approved)' in df.columns:
+        low_performance = df['Curricular units 1st sem (approved)'] <= 2
+        risk_factors.append(('Low 1st Sem Performance (≤2 units)', low_performance.sum()))
+
+    if 'Age at enrollment' in df.columns:
+        mature_students = df['Age at enrollment'] > 25
+        risk_factors.append(('Mature Students (>25 years)', mature_students.sum()))
+
+    if 'Scholarship holder' in df.columns:
+        no_scholarship = df['Scholarship holder'] == 0
+        risk_factors.append(('No Financial Aid', no_scholarship.sum()))
+
+    if 'Displaced' in df.columns:
+        displaced = df['Displaced'] == 1
+        risk_factors.append(('Displaced Students', displaced.sum()))
+
+    if risk_factors:
+        risk_df = pd.DataFrame(risk_factors, columns=['Risk Factor', 'Number of Students'])
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+        bars = ax.bar(risk_df['Risk Factor'], risk_df['Number of Students'],
+                      color=['red', 'orange', 'yellow', 'coral'][:len(risk_factors)])
+        ax.set_title('Number of Students by Risk Factor')
+        ax.set_ylabel('Number of Students')
+        plt.xticks(rotation=45, ha='right')
+
+        # Add value labels on bars
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width() / 2., height,
+                    f'{int(height)}', ha='center', va='bottom')
+
+        plt.tight_layout()
+        st.pyplot(fig)
+
+    # Sample Data Preview with Context
+    st.subheader("📋 Data Sample & Structure")
+
+    # Enhanced data preview
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        st.write("**Sample of Student Records:**")
+        # Show more meaningful sample
+        sample_df = df.head(10)
+
+        # Add outcome colors - FIXED: Use .map() instead of .applymap()
+        def highlight_outcome(val):
+            if val == 'Dropout':
+                return 'background-color: #ffcccc'
+            elif val == 'Graduate':
+                return 'background-color: #ccffcc'
+            else:
+                return 'background-color: #ffffcc'
+
+        # Use .map() instead of .applymap() for single column styling
+        styled_df = sample_df.style.map(highlight_outcome, subset=['Target'])
+        st.dataframe(styled_df)
+
+    with col2:
+        st.write("**Dataset Composition:**")
+        st.write(f"• **Rows:** {df.shape[0]:,} students")
+        st.write(f"• **Columns:** {df.shape[1]} features")
+
+        # Feature categories
+        demographic_cols = ['Gender', 'Age at enrollment', 'Marital status', 'Nacionality']
+        academic_cols = [col for col in df.columns if 'grade' in col.lower() or 'units' in col.lower()]
+        economic_cols = ['Unemployment rate', 'Inflation rate', 'GDP']
+
+        st.write("**Feature Categories:**")
+        st.write(f"• Demographics: {len([c for c in demographic_cols if c in df.columns])}")
+        st.write(f"• Academic: {len([c for c in academic_cols if c in df.columns])}")
+        st.write(f"• Economic: {len([c for c in economic_cols if c in df.columns])}")
+        st.write(
+            f"• Other: {df.shape[1] - len([c for c in demographic_cols + academic_cols + economic_cols if c in df.columns])}")
+
+    # Interactive Feature Explorer
+    st.subheader("🔧 Interactive Feature Explorer")
+
+    # Allow users to explore specific columns
+    col_to_explore = st.selectbox(
+        "Select a feature to explore in detail:",
+        options=[col for col in df.columns if col != 'Target' and col != 'id']
+    )
+
+    if col_to_explore:
+        col1, col2 = st.columns(2)
+
+        with col1:
+            # Basic statistics
+            st.write(f"**Statistics for {col_to_explore}:**")
+            if df[col_to_explore].dtype in ['int64', 'float64']:
+                stats = df[col_to_explore].describe()
+                for stat, value in stats.items():
+                    st.write(f"• **{stat}:** {value:.2f}")
+            else:
+                unique_vals = df[col_to_explore].nunique()
+                st.write(f"• **Unique values:** {unique_vals}")
+                st.write(f"• **Most common:** {df[col_to_explore].mode().iloc[0]}")
+
+        with col2:
+            # Relationship with target
+            st.write(f"**{col_to_explore} vs Dropout Rate:**")
+            if df[col_to_explore].dtype in ['int64', 'float64']:
+                # For numeric columns, show correlation
+                correlation = df[col_to_explore].corr(df['Target'].map(TARGET_MAPPING))
+                st.write(f"• **Correlation with dropout:** {correlation:.3f}")
+
+                # Create bins for better visualization - FIXED: Handle division by zero
+                df_temp = df.copy()
+                try:
+                    df_temp[f'{col_to_explore}_binned'] = pd.cut(df_temp[col_to_explore], bins=5)
+                    dropout_by_bin = df_temp.groupby(f'{col_to_explore}_binned', observed=True)['Target'].apply(
+                        lambda x: (x == 'Dropout').mean() * 100 if len(x) > 0 else 0
+                    ).round(1)
+
+                    for bin_range, dropout_rate in dropout_by_bin.items():
+                        st.write(f"• **{bin_range}:** {dropout_rate:.1f}% dropout rate")
+                except Exception as e:
+                    st.write(f"• Unable to create bins for this feature: {str(e)}")
+            else:
+                # For categorical columns - FIXED: Add observed=True
+                dropout_by_cat = df.groupby(col_to_explore, observed=True)['Target'].apply(
+                    lambda x: (x == 'Dropout').mean() * 100 if len(x) > 0 else 0
+                ).round(1)
+
+                for category, dropout_rate in dropout_by_cat.items():
+                    st.write(f"• **{category}:** {dropout_rate:.1f}% dropout rate")
+
+    # Expandable detailed column information
+    with st.expander("📋 Detailed Column Information"):
+        column_info = pd.DataFrame({
+            'Column Name': df.columns,
+            'Data Type': df.dtypes.astype(str),
+            'Non-Null Count': df.count(),
+            'Null Count': df.isnull().sum(),
+            'Null Percentage': (df.isnull().sum() / len(df) * 100).round(2),
+            'Unique Values': df.nunique()
+        })
+
+        # Add interpretation column
+        def interpret_column(row):
+            if row['Null Percentage'] > 10:
+                return "⚠️ High missing data"
+            elif row['Unique Values'] == 1:
+                return "❌ No variation"
+            elif row['Unique Values'] == len(df):
+                return "🔑 Unique identifier"
+            elif row['Unique Values'] < 10:
+                return "📊 Categorical"
+            else:
+                return "📈 Continuous"
+
+        column_info['Interpretation'] = column_info.apply(interpret_column, axis=1)
+        st.dataframe(column_info)
 
 
 def load_data(uploaded_file=None):
@@ -500,31 +765,72 @@ def main():
 
     # Handle different menu choices
     if choice == "Data Overview":
-        display_dataframe_info(df)
+        display_enhanced_dataframe_info(df)
 
     elif choice == "Exploratory Data Analysis":
-        st.header("Exploratory Data Analysis")
+        st.header("📊 Exploratory Data Analysis")
+
+        # Create a copy of dataframe with better labels for visualization
+        df_viz = df.copy()
+
+        # Create label mappings for better visualization
+        label_mappings = {
+            'Gender': {0: 'Female', 1: 'Male'},
+            'Scholarship holder': {0: 'No Scholarship', 1: 'Has Scholarship'},
+            'Displaced': {0: 'Not Displaced', 1: 'Displaced'},
+            'International': {0: 'Domestic', 1: 'International'},
+            'Debtor': {0: 'No Debt', 1: 'Has Debt'},
+            'Tuition fees up to date': {0: 'Fees Not Updated', 1: 'Fees Updated'},
+            'Educational special needs': {0: 'No Special Needs', 1: 'Has Special Needs'},
+            'Daytime/evening attendance': {0: 'Evening', 1: 'Daytime'}
+        }
+
+        # Apply label mappings to visualization dataframe
+        for col, mapping in label_mappings.items():
+            if col in df_viz.columns:
+                df_viz[col] = df_viz[col].map(mapping).fillna(df_viz[col])
 
         # Create tabs for different visualizations
-        tabs = st.tabs(["Distribution Analysis", "Correlation Analysis", "Outcome Analysis"])
+        tabs = st.tabs(
+            ["📈 Distribution Analysis", "🔗 Correlation Analysis", "🎯 Outcome Analysis", "📊 Academic Performance"])
 
         with tabs[0]:
             st.subheader("Feature Distributions")
 
             # Select columns to visualize
             numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
+            # Remove target and id columns from selection
+            numeric_cols = [col for col in numeric_cols if col not in ['Target', 'id']]
+
             selected_columns = st.multiselect(
-                "Select features to visualize",
+                "Select features to visualize (up to 4 for better layout)",
                 options=numeric_cols,
-                default=['Age at enrollment', 'Admission grade', 'Curricular units 1st sem (grade)']
+                default=['Age at enrollment', 'Admission grade', 'Curricular units 1st sem (grade)'][:3],
+                max_selections=4
             )
 
             if selected_columns:
-                for column in selected_columns:
-                    fig, ax = plt.subplots(figsize=(10, 6))
-                    sns.histplot(df[column], kde=True, ax=ax)
-                    ax.set_title(f'Distribution of {column}')
-                    st.pyplot(fig)
+                # Create grid layout based on number of selected columns
+                if len(selected_columns) == 1:
+                    cols = st.columns(1)
+                elif len(selected_columns) == 2:
+                    cols = st.columns(2)
+                elif len(selected_columns) == 3:
+                    cols = st.columns(3)
+                else:  # 4 columns
+                    cols = st.columns(2)  # 2x2 grid
+
+                for i, column in enumerate(selected_columns):
+                    with cols[i % len(cols)]:
+                        fig, ax = plt.subplots(figsize=(6, 4))
+                        sns.histplot(df[column], kde=True, ax=ax, color='skyblue', alpha=0.7)
+                        ax.set_title(f'{column}', fontsize=10, fontweight='bold')
+                        ax.set_xlabel('')
+                        ax.tick_params(axis='x', labelsize=8)
+                        ax.tick_params(axis='y', labelsize=8)
+                        plt.tight_layout()
+                        st.pyplot(fig)
+                        plt.close()
             else:
                 st.info("Please select at least one column to visualize")
 
@@ -536,29 +842,76 @@ def main():
                 "Select features for correlation analysis",
                 options=numeric_cols,
                 default=['Age at enrollment', 'Admission grade', 'Curricular units 1st sem (grade)',
-                         'Curricular units 2nd sem (grade)', 'Unemployment rate']
+                         'Curricular units 2nd sem (grade)', 'Unemployment rate'][:4]
             )
 
             if len(correlation_features) > 1:
-                correlation_matrix = df[correlation_features].corr()
-                fig, ax = plt.subplots(figsize=(10, 8))
-                sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', ax=ax)
-                st.pyplot(fig)
+                col1, col2 = st.columns([2, 1])
+
+                with col1:
+                    correlation_matrix = df[correlation_features].corr()
+                    fig, ax = plt.subplots(figsize=(8, 6))
+                    sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', ax=ax,
+                                center=0, square=True, fmt='.2f', cbar_kws={"shrink": .8})
+                    ax.set_title('Feature Correlation Matrix', fontweight='bold')
+                    plt.tight_layout()
+                    st.pyplot(fig)
+                    plt.close()
+
+                with col2:
+                    st.write("**Correlation Insights:**")
+                    # Find strongest correlations
+                    corr_pairs = []
+                    for i in range(len(correlation_matrix.columns)):
+                        for j in range(i + 1, len(correlation_matrix.columns)):
+                            corr_value = correlation_matrix.iloc[i, j]
+                            if abs(corr_value) > 0.5:  # Only show strong correlations
+                                corr_pairs.append((
+                                    correlation_matrix.columns[i],
+                                    correlation_matrix.columns[j],
+                                    corr_value
+                                ))
+
+                    if corr_pairs:
+                        corr_pairs.sort(key=lambda x: abs(x[2]), reverse=True)
+                        for feat1, feat2, corr in corr_pairs[:5]:  # Show top 5
+                            direction = "positive" if corr > 0 else "negative"
+                            st.write(f"• **{feat1}** & **{feat2}**: {direction} ({corr:.2f})")
+                    else:
+                        st.write("No strong correlations (>0.5) found between selected features.")
             else:
                 st.info("Please select at least two features for correlation analysis")
 
         with tabs[2]:
             st.subheader("Student Outcome Analysis")
 
-            # Simple count plot of target variable
-            fig, ax = plt.subplots(figsize=(8, 6))
-            target_counts = df['Target'].value_counts().reset_index()
-            target_counts.columns = ['Outcome', 'Count']
-            sns.barplot(x='Outcome', y='Count', data=target_counts, ax=ax)
-            ax.set_title('Distribution of Student Outcomes')
-            st.pyplot(fig)
+            col1, col2 = st.columns([1, 1])
+
+            with col1:
+                # Target distribution
+                fig, ax = plt.subplots(figsize=(6, 4))
+                target_counts = df['Target'].value_counts()
+                colors = ['#ff9999', '#66b3ff', '#99ff99']
+                wedges, texts, autotexts = ax.pie(target_counts.values, labels=target_counts.index,
+                                                  autopct='%1.1f%%', colors=colors, startangle=90)
+                ax.set_title('Distribution of Student Outcomes', fontweight='bold')
+                st.pyplot(fig)
+                plt.close()
+
+            with col2:
+                # Outcome statistics
+                st.write("**Outcome Statistics:**")
+                total_students = len(df)
+                for outcome in df['Target'].unique():
+                    count = (df['Target'] == outcome).sum()
+                    percentage = count / total_students * 100
+                    st.write(f"• **{outcome}**: {count:,} students ({percentage:.1f}%)")
+
+                st.write(f"\n**Total Students**: {total_students:,}")
 
             # Target distribution by key factors
+            st.subheader("Outcome Analysis by Demographics")
+
             factor_cols = st.multiselect(
                 "Select factors to analyze against outcomes",
                 options=['Gender', 'Scholarship holder', 'Displaced', 'International'],
@@ -566,15 +919,117 @@ def main():
             )
 
             if factor_cols:
-                for col in factor_cols:
-                    fig, ax = plt.subplots(figsize=(10, 6))
-                    # Convert to numeric for consistency in crosstab
-                    cross_tab = pd.crosstab(df[col], df['Target'])
-                    cross_tab.plot(kind='bar', stacked=True, ax=ax)
-                    ax.set_title(f'Outcome Distribution by {col}')
-                    ax.set_ylabel('Count')
-                    ax.legend(title='Outcome')
+                # Create a grid layout for factor analysis
+                if len(factor_cols) <= 2:
+                    cols = st.columns(len(factor_cols))
+                else:
+                    cols = st.columns(2)  # 2x2 grid for more factors
+
+                for i, col in enumerate(factor_cols):
+                    with cols[i % len(cols)]:
+                        fig, ax = plt.subplots(figsize=(6, 4))
+
+                        # Use the visualization dataframe with proper labels
+                        cross_tab = pd.crosstab(df_viz[col], df_viz['Target'])
+                        cross_tab_pct = cross_tab.div(cross_tab.sum(axis=1), axis=0) * 100
+
+                        cross_tab_pct.plot(kind='bar', stacked=False, ax=ax,
+                                           color=['#ff9999', '#66b3ff', '#99ff99'])
+                        ax.set_title(f'Outcome Distribution by {col}', fontweight='bold', fontsize=10)
+                        ax.set_ylabel('Percentage (%)', fontsize=8)
+                        ax.set_xlabel('')
+                        ax.legend(title='Outcome', fontsize=8, title_fontsize=8)
+                        ax.tick_params(axis='x', labelsize=8, rotation=45)
+                        ax.tick_params(axis='y', labelsize=8)
+                        plt.tight_layout()
+                        st.pyplot(fig)
+                        plt.close()
+
+        with tabs[3]:
+            st.subheader("Academic Performance Analysis")
+
+            # Academic performance metrics
+            academic_cols = [col for col in df.columns if 'grade' in col.lower() or 'approved' in col.lower()]
+            academic_cols = [col for col in academic_cols if col in numeric_cols]
+
+            if academic_cols:
+                selected_academic = st.multiselect(
+                    "Select academic performance metrics",
+                    options=academic_cols,
+                    default=academic_cols[:2]
+                )
+
+                if selected_academic:
+                    for col in selected_academic:
+                        st.write(f"**{col} by Outcome**")
+
+                        col1, col2 = st.columns([2, 1])
+
+                        with col1:
+                            fig, ax = plt.subplots(figsize=(8, 4))
+
+                            # Box plot showing distribution by outcome
+                            sns.boxplot(data=df, x='Target', y=col, ax=ax, palette='Set2')
+                            ax.set_title(f'{col} Distribution by Student Outcome', fontweight='bold')
+                            ax.set_xlabel('Student Outcome')
+                            ax.set_ylabel(col)
+                            plt.tight_layout()
+                            st.pyplot(fig)
+                            plt.close()
+
+                        with col2:
+                            # Summary statistics
+                            st.write("**Summary Statistics:**")
+                            summary_stats = df.groupby('Target')[col].agg(['mean', 'median', 'std']).round(2)
+                            for outcome in summary_stats.index:
+                                st.write(f"**{outcome}:**")
+                                st.write(f"• Mean: {summary_stats.loc[outcome, 'mean']}")
+                                st.write(f"• Median: {summary_stats.loc[outcome, 'median']}")
+                                st.write(f"• Std Dev: {summary_stats.loc[outcome, 'std']}")
+                                st.write("")
+            else:
+                st.info("No academic performance columns found in the dataset.")
+
+            # Performance comparison
+            st.subheader("Academic Performance Comparison")
+
+            if 'Curricular units 1st sem (grade)' in df.columns and 'Curricular units 2nd sem (grade)' in df.columns:
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    # Scatter plot of 1st vs 2nd semester performance
+                    fig, ax = plt.subplots(figsize=(6, 5))
+                    colors = {'Graduate': 'green', 'Dropout': 'red', 'Enrolled': 'blue'}
+                    for outcome in df['Target'].unique():
+                        subset = df[df['Target'] == outcome]
+                        ax.scatter(subset['Curricular units 1st sem (grade)'],
+                                   subset['Curricular units 2nd sem (grade)'],
+                                   c=colors.get(outcome, 'gray'), label=outcome, alpha=0.6, s=30)
+
+                    ax.set_xlabel('1st Semester Grade')
+                    ax.set_ylabel('2nd Semester Grade')
+                    ax.set_title('Academic Performance: 1st vs 2nd Semester', fontweight='bold')
+                    ax.legend()
+                    ax.grid(True, alpha=0.3)
+                    plt.tight_layout()
                     st.pyplot(fig)
+                    plt.close()
+
+                with col2:
+                    # Performance improvement analysis
+                    df_temp = df.copy()
+                    df_temp['Performance_Change'] = (df_temp['Curricular units 2nd sem (grade)'] -
+                                                     df_temp['Curricular units 1st sem (grade)'])
+
+                    fig, ax = plt.subplots(figsize=(6, 5))
+                    sns.boxplot(data=df_temp, x='Target', y='Performance_Change', ax=ax, palette='Set3')
+                    ax.set_title('Performance Change (2nd - 1st Semester)', fontweight='bold')
+                    ax.set_xlabel('Student Outcome')
+                    ax.set_ylabel('Grade Change')
+                    ax.axhline(y=0, color='red', linestyle='--', alpha=0.7)
+                    plt.tight_layout()
+                    st.pyplot(fig)
+                    plt.close()
 
     elif choice == "Model Training & Evaluation":
         st.header("Model Training & Evaluation")
