@@ -22,7 +22,7 @@ TARGET_MAPPING = {
 }
 
 
-# Fix for the styled dataframe (around line 213)
+# Fix for Data Quality Assessment alignment (around line 45-80)
 def display_enhanced_dataframe_info(df):
     """Display enhanced and insightful dataframe information"""
     st.header("📊 Data Overview & Insights")
@@ -45,18 +45,20 @@ def display_enhanced_dataframe_info(df):
         missing_data_pct = df.isnull().sum().sum() / (df.shape[0] * df.shape[1]) * 100
         st.metric("Missing Data", f"{missing_data_pct:.1f}%")
 
-    # Data Quality Overview
+    # Data Quality Overview - FIXED ALIGNMENT
     st.subheader("🔍 Data Quality Assessment")
 
-    col1, col2 = st.columns(2)
+    # Create two equal columns for better alignment
+    col1, col2 = st.columns([1, 1])  # Equal width columns
 
     with col1:
+        st.write("**Missing Data Analysis**")
         # Missing data visualization
         missing_data = df.isnull().sum()
         missing_data = missing_data[missing_data > 0].sort_values(ascending=False)
 
         if len(missing_data) > 0:
-            fig, ax = plt.subplots(figsize=(10, 6))
+            fig, ax = plt.subplots(figsize=(8, 5))  # Adjusted figure size
             missing_data.plot(kind='bar', ax=ax, color='coral')
             ax.set_title('Missing Data by Column')
             ax.set_ylabel('Number of Missing Values')
@@ -64,92 +66,167 @@ def display_enhanced_dataframe_info(df):
             plt.xticks(rotation=45, ha='right')
             plt.tight_layout()
             st.pyplot(fig)
+            plt.close()
         else:
             st.success("✅ No missing data found!")
 
     with col2:
+        st.write("**Data Types Distribution**")
         # Data types distribution
         dtype_counts = df.dtypes.value_counts()
-        fig, ax = plt.subplots(figsize=(8, 6))
+        fig, ax = plt.subplots(figsize=(8, 5))  # Adjusted figure size
         colors = ['skyblue', 'lightcoral', 'lightgreen', 'gold']
         dtype_counts.plot(kind='pie', ax=ax, autopct='%1.1f%%', colors=colors[:len(dtype_counts)])
         ax.set_title('Distribution of Data Types')
         ax.set_ylabel('')
+        plt.tight_layout()
         st.pyplot(fig)
+        plt.close()
 
-    # Student Demographics Insights
+    # Student Demographics Insights - FIXED ALIGNMENT
     st.subheader("👥 Student Demographics Insights")
 
-    col1, col2, col3 = st.columns(3)
+    # Create three equal columns for better alignment
+    col1, col2, col3 = st.columns([1, 1, 1])  # Equal width columns
 
     with col1:
+        st.write("**Age Distribution**")
         # Age distribution
         if 'Age at enrollment' in df.columns:
-            fig, ax = plt.subplots(figsize=(8, 6))
+            fig, ax = plt.subplots(figsize=(6, 4))  # Consistent figure size
             df['Age at enrollment'].hist(bins=20, ax=ax, color='lightblue', alpha=0.7, edgecolor='black')
             ax.axvline(df['Age at enrollment'].mean(), color='red', linestyle='--',
                        label=f'Mean: {df["Age at enrollment"].mean():.1f}')
-            ax.set_title('Age Distribution at Enrollment')
+            ax.set_title('Age at Enrollment')
             ax.set_xlabel('Age')
-            ax.set_ylabel('Frequency')
+            ax.set_ylabel('Count')
             ax.legend()
+            plt.tight_layout()
             st.pyplot(fig)
+            plt.close()
 
     with col2:
+        st.write("**Gender Distribution**")
         # Gender distribution
         if 'Gender' in df.columns:
             gender_counts = df['Gender'].value_counts()
             gender_labels = ['Female' if x == 0 else 'Male' for x in gender_counts.index]
 
-            fig, ax = plt.subplots(figsize=(8, 6))
+            fig, ax = plt.subplots(figsize=(6, 4))  # Consistent figure size
             ax.pie(gender_counts.values, labels=gender_labels, autopct='%1.1f%%',
                    colors=['pink', 'lightblue'])
             ax.set_title('Gender Distribution')
+            plt.tight_layout()
             st.pyplot(fig)
+            plt.close()
 
     with col3:
+        st.write("**Scholarship Distribution**")
         # Scholarship distribution
         if 'Scholarship holder' in df.columns:
             scholarship_counts = df['Scholarship holder'].value_counts()
             scholarship_labels = ['No Scholarship' if x == 0 else 'Scholarship' for x in scholarship_counts.index]
 
-            fig, ax = plt.subplots(figsize=(8, 6))
+            fig, ax = plt.subplots(figsize=(6, 4))  # Consistent figure size
             ax.pie(scholarship_counts.values, labels=scholarship_labels, autopct='%1.1f%%',
                    colors=['lightcoral', 'lightgreen'])
-            ax.set_title('Scholarship Distribution')
+            ax.set_title('Scholarship Status')
+            plt.tight_layout()
             st.pyplot(fig)
+            plt.close()
 
-    # Academic Performance Overview
+    # Continue with the rest of the function...
+    # Academic Performance Overview - SIMPLIFIED AND USER-FRIENDLY
     st.subheader("📚 Academic Performance Overview")
+
+    # Add explanation for the audience
+    st.info(
+        "💡 **What this shows:** How well students performed academically and how it relates to their final outcome (Graduate/Dropout)")
 
     col1, col2 = st.columns(2)
 
     with col1:
+        st.write("**Admission Grades vs Final Outcome**")
+        st.caption("Shows how entrance exam scores relate to student success")
+
         # Admission grades distribution by outcome
         if 'Admission grade' in df.columns:
-            fig, ax = plt.subplots(figsize=(10, 6))
+            fig, ax = plt.subplots(figsize=(8, 5))
+
+            # Create cleaner visualization with better colors and labels
+            colors = {'Graduate': 'green', 'Dropout': 'red', 'Enrolled': 'orange'}
             for outcome in df['Target'].unique():
                 subset = df[df['Target'] == outcome]['Admission grade']
-                ax.hist(subset, alpha=0.7, label=outcome, bins=20)
-            ax.set_title('Admission Grade Distribution by Outcome')
-            ax.set_xlabel('Admission Grade')
-            ax.set_ylabel('Frequency')
+                ax.hist(subset, alpha=0.6, label=f'{outcome} ({len(subset)} students)',
+                        bins=15, color=colors.get(outcome, 'gray'))
+
+            ax.set_title('Admission Grade Distribution by Student Outcome', fontweight='bold')
+            ax.set_xlabel('Admission Grade (Higher = Better)')
+            ax.set_ylabel('Number of Students')
             ax.legend()
+            ax.grid(True, alpha=0.3)
+            plt.tight_layout()
             st.pyplot(fig)
+            plt.close()
+
+            # Add interpretation
+            st.caption("📊 **Key Insight:** Students with higher admission grades are more likely to graduate")
 
     with col2:
+        st.write("**First Semester Performance vs Final Outcome**")
+        st.caption("Shows how first semester grades predict student success")
+
         # First semester performance
         if 'Curricular units 1st sem (grade)' in df.columns:
-            fig, ax = plt.subplots(figsize=(10, 6))
+            fig, ax = plt.subplots(figsize=(8, 5))
+
+            colors = {'Graduate': 'green', 'Dropout': 'red', 'Enrolled': 'orange'}
             for outcome in df['Target'].unique():
                 subset = df[df['Target'] == outcome]['Curricular units 1st sem (grade)']
-                ax.hist(subset, alpha=0.7, label=outcome, bins=20)
-            ax.set_title('1st Semester Grade Distribution by Outcome')
-            ax.set_xlabel('Average Grade')
-            ax.set_ylabel('Frequency')
-            ax.legend()
-            st.pyplot(fig)
+                ax.hist(subset, alpha=0.6, label=f'{outcome} ({len(subset)} students)',
+                        bins=15, color=colors.get(outcome, 'gray'))
 
+            ax.set_title('1st Semester Grade Distribution by Student Outcome', fontweight='bold')
+            ax.set_xlabel('Average Grade (0-20 scale)')
+            ax.set_ylabel('Number of Students')
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+            plt.tight_layout()
+            st.pyplot(fig)
+            plt.close()
+
+            # Add interpretation
+            st.caption("📊 **Key Insight:** Strong first semester performance is crucial for graduation")
+
+    # Add summary statistics in a user-friendly format
+    if 'Admission grade' in df.columns and 'Curricular units 1st sem (grade)' in df.columns:
+        st.subheader("📈 Performance Summary")
+
+        # Create summary table
+        summary_col1, summary_col2, summary_col3 = st.columns(3)
+
+        with summary_col1:
+            st.metric(
+                label="Average Admission Grade (Graduates)",
+                value=f"{df[df['Target'] == 'Graduate']['Admission grade'].mean():.1f}",
+                delta=f"{df[df['Target'] == 'Graduate']['Admission grade'].mean() - df[df['Target'] == 'Dropout']['Admission grade'].mean():.1f} vs Dropouts"
+            )
+
+        with summary_col2:
+            st.metric(
+                label="Average 1st Sem Grade (Graduates)",
+                value=f"{df[df['Target'] == 'Graduate']['Curricular units 1st sem (grade)'].mean():.1f}",
+                delta=f"{df[df['Target'] == 'Graduate']['Curricular units 1st sem (grade)'].mean() - df[df['Target'] == 'Dropout']['Curricular units 1st sem (grade)'].mean():.1f} vs Dropouts"
+            )
+
+        with summary_col3:
+            # Calculate success rate for high performers
+            high_performers = df[df['Curricular units 1st sem (grade)'] > 15]
+            success_rate = (high_performers['Target'] == 'Graduate').mean() * 100 if len(high_performers) > 0 else 0
+            st.metric(
+                label="Success Rate (Grade >15)",
+                value=f"{success_rate:.1f}%"
+            )
     # Key Risk Factors Analysis
     st.subheader("⚠️ Key Risk Factors Analysis")
 
@@ -948,88 +1025,214 @@ def main():
         with tabs[3]:
             st.subheader("Academic Performance Analysis")
 
+            # Add user-friendly explanation
+            st.info(
+                "💡 **Understanding Academic Performance:** This section shows how different academic metrics relate to student success. Higher grades and more approved units typically indicate better chances of graduation.")
+
             # Academic performance metrics
             academic_cols = [col for col in df.columns if 'grade' in col.lower() or 'approved' in col.lower()]
             academic_cols = [col for col in academic_cols if col in numeric_cols]
 
             if academic_cols:
+                # Simplified selection with better defaults
+                default_metrics = []
+                if 'Curricular units 1st sem (grade)' in academic_cols:
+                    default_metrics.append('Curricular units 1st sem (grade)')
+                if 'Curricular units 1st sem (approved)' in academic_cols:
+                    default_metrics.append('Curricular units 1st sem (approved)')
+
                 selected_academic = st.multiselect(
-                    "Select academic performance metrics",
+                    "Select academic performance metrics to analyze",
                     options=academic_cols,
-                    default=academic_cols[:2]
+                    default=default_metrics[:2],
+                    help="Choose metrics to see how they relate to student outcomes"
                 )
 
                 if selected_academic:
                     for col in selected_academic:
-                        st.write(f"**{col} by Outcome**")
+                        # Create user-friendly column names
+                        friendly_name = col.replace('Curricular units 1st sem (grade)', 'First Semester Grades') \
+                            .replace('Curricular units 1st sem (approved)', 'First Semester Units Passed') \
+                            .replace('Curricular units 2nd sem (grade)', 'Second Semester Grades') \
+                            .replace('Curricular units 2nd sem (approved)', 'Second Semester Units Passed')
+
+                        st.write(f"**{friendly_name} Analysis**")
 
                         col1, col2 = st.columns([2, 1])
 
                         with col1:
-                            fig, ax = plt.subplots(figsize=(8, 4))
+                            fig, ax = plt.subplots(figsize=(10, 5))
 
-                            # Box plot showing distribution by outcome
-                            sns.boxplot(data=df, x='Target', y=col, ax=ax, palette='Set2')
-                            ax.set_title(f'{col} Distribution by Student Outcome', fontweight='bold')
-                            ax.set_xlabel('Student Outcome')
-                            ax.set_ylabel(col)
+                            # Create a cleaner box plot with better styling
+                            colors = ['lightcoral', 'lightgreen', 'lightskyblue']
+                            box_plot = ax.boxplot(
+                                [df[df['Target'] == outcome][col].dropna() for outcome in df['Target'].unique()],
+                                labels=df['Target'].unique(),
+                                patch_artist=True)
+
+                            # Color the boxes
+                            for patch, color in zip(box_plot['boxes'], colors):
+                                patch.set_facecolor(color)
+                                patch.set_alpha(0.7)
+
+                            ax.set_title(f'{friendly_name} by Student Outcome', fontweight='bold', fontsize=12)
+                            ax.set_xlabel('Student Outcome', fontweight='bold')
+                            ax.set_ylabel(friendly_name, fontweight='bold')
+                            ax.grid(True, alpha=0.3)
                             plt.tight_layout()
                             st.pyplot(fig)
                             plt.close()
 
                         with col2:
-                            # Summary statistics
-                            st.write("**Summary Statistics:**")
-                            summary_stats = df.groupby('Target')[col].agg(['mean', 'median', 'std']).round(2)
+                            # Simplified summary statistics with interpretation
+                            st.write("**Quick Summary:**")
+
+                            summary_stats = df.groupby('Target')[col].agg(['mean', 'count']).round(2)
+
                             for outcome in summary_stats.index:
-                                st.write(f"**{outcome}:**")
-                                st.write(f"• Mean: {summary_stats.loc[outcome, 'mean']}")
-                                st.write(f"• Median: {summary_stats.loc[outcome, 'median']}")
-                                st.write(f"• Std Dev: {summary_stats.loc[outcome, 'std']}")
+                                mean_val = summary_stats.loc[outcome, 'mean']
+                                count_val = int(summary_stats.loc[outcome, 'count'])
+
+                                # Add emoji indicators
+                                if outcome == 'Graduate':
+                                    emoji = "🎓"
+                                elif outcome == 'Dropout':
+                                    emoji = "⚠️"
+                                else:
+                                    emoji = "📚"
+
+                                st.write(f"{emoji} **{outcome}:**")
+                                st.write(f"   Average: {mean_val}")
+                                st.write(f"   Students: {count_val}")
                                 st.write("")
+
+                            # Add insight
+                            graduate_mean = summary_stats.loc[
+                                'Graduate', 'mean'] if 'Graduate' in summary_stats.index else 0
+                            dropout_mean = summary_stats.loc[
+                                'Dropout', 'mean'] if 'Dropout' in summary_stats.index else 0
+
+                            if graduate_mean > dropout_mean:
+                                st.success("✅ Graduates perform better on this metric")
+                            else:
+                                st.warning("⚠️ Dropouts show similar/better performance")
             else:
                 st.info("No academic performance columns found in the dataset.")
 
-            # Performance comparison
-            st.subheader("Academic Performance Comparison")
+            # Simplified Performance comparison with better explanation
+            st.subheader("📊 Semester-by-Semester Comparison")
+            st.info(
+                "💡 **What this shows:** How student performance changes from first to second semester, and how this relates to their final outcome.")
 
             if 'Curricular units 1st sem (grade)' in df.columns and 'Curricular units 2nd sem (grade)' in df.columns:
                 col1, col2 = st.columns(2)
 
                 with col1:
-                    # Scatter plot of 1st vs 2nd semester performance
-                    fig, ax = plt.subplots(figsize=(6, 5))
-                    colors = {'Graduate': 'green', 'Dropout': 'red', 'Enrolled': 'blue'}
+                    st.write("**Grade Comparison: 1st vs 2nd Semester**")
+                    st.caption("Each dot represents one student")
+
+                    # Simplified scatter plot with better colors and less clutter
+                    fig, ax = plt.subplots(figsize=(8, 6))
+
+                    colors = {'Graduate': '#2E8B57', 'Dropout': '#DC143C', 'Enrolled': '#FF8C00'}
+                    markers = {'Graduate': 'o', 'Dropout': 's', 'Enrolled': '^'}
+
                     for outcome in df['Target'].unique():
                         subset = df[df['Target'] == outcome]
                         ax.scatter(subset['Curricular units 1st sem (grade)'],
                                    subset['Curricular units 2nd sem (grade)'],
-                                   c=colors.get(outcome, 'gray'), label=outcome, alpha=0.6, s=30)
+                                   c=colors.get(outcome, 'gray'),
+                                   label=f'{outcome} ({len(subset)} students)',
+                                   alpha=0.6, s=40, marker=markers.get(outcome, 'o'))
 
-                    ax.set_xlabel('1st Semester Grade')
-                    ax.set_ylabel('2nd Semester Grade')
+                    # Add diagonal line for reference
+                    ax.plot([0, 20], [0, 20], 'k--', alpha=0.3, label='Same performance line')
+
+                    ax.set_xlabel('1st Semester Grade', fontweight='bold')
+                    ax.set_ylabel('2nd Semester Grade', fontweight='bold')
                     ax.set_title('Academic Performance: 1st vs 2nd Semester', fontweight='bold')
                     ax.legend()
                     ax.grid(True, alpha=0.3)
+                    ax.set_xlim(0, 20)
+                    ax.set_ylim(0, 20)
                     plt.tight_layout()
                     st.pyplot(fig)
                     plt.close()
 
                 with col2:
-                    # Performance improvement analysis
+                    st.write("**Performance Change Analysis**")
+                    st.caption("Shows if students improved or declined from 1st to 2nd semester")
+
+                    # Performance improvement analysis with clearer visualization
                     df_temp = df.copy()
                     df_temp['Performance_Change'] = (df_temp['Curricular units 2nd sem (grade)'] -
                                                      df_temp['Curricular units 1st sem (grade)'])
 
-                    fig, ax = plt.subplots(figsize=(6, 5))
-                    sns.boxplot(data=df_temp, x='Target', y='Performance_Change', ax=ax, palette='Set3')
-                    ax.set_title('Performance Change (2nd - 1st Semester)', fontweight='bold')
-                    ax.set_xlabel('Student Outcome')
-                    ax.set_ylabel('Grade Change')
-                    ax.axhline(y=0, color='red', linestyle='--', alpha=0.7)
+                    fig, ax = plt.subplots(figsize=(8, 6))
+
+                    # Create violin plot for better distribution visualization
+                    colors = ['lightcoral', 'lightgreen', 'lightskyblue']
+                    outcomes = df_temp['Target'].unique()
+
+                    violin_parts = ax.violinplot([df_temp[df_temp['Target'] == outcome]['Performance_Change'].dropna()
+                                                  for outcome in outcomes], positions=range(len(outcomes)),
+                                                 showmeans=True)
+
+                    # Color the violin plots
+                    for i, pc in enumerate(violin_parts['bodies']):
+                        pc.set_facecolor(colors[i % len(colors)])
+                        pc.set_alpha(0.7)
+
+                    ax.set_xticks(range(len(outcomes)))
+                    ax.set_xticklabels(outcomes)
+                    ax.set_title('Grade Change from 1st to 2nd Semester', fontweight='bold')
+                    ax.set_xlabel('Student Outcome', fontweight='bold')
+                    ax.set_ylabel('Grade Change (2nd - 1st)', fontweight='bold')
+                    ax.axhline(y=0, color='red', linestyle='--', alpha=0.7, label='No change')
+                    ax.grid(True, alpha=0.3)
+                    ax.legend()
                     plt.tight_layout()
                     st.pyplot(fig)
                     plt.close()
+
+                # Add summary insights
+                st.subheader("🔍 Key Insights")
+                col1, col2, col3 = st.columns(3)
+
+                with col1:
+                    # Calculate improvement rate for graduates
+                    graduates = df_temp[df_temp['Target'] == 'Graduate']
+                    improved_graduates = (graduates['Performance_Change'] > 0).sum()
+                    total_graduates = len(graduates)
+                    improvement_rate = (improved_graduates / total_graduates * 100) if total_graduates > 0 else 0
+
+                    st.metric(
+                        label="Graduates Who Improved",
+                        value=f"{improvement_rate:.1f}%",
+                        help="Percentage of graduates who had better grades in 2nd semester"
+                    )
+
+                with col2:
+                    # Calculate decline rate for dropouts
+                    dropouts = df_temp[df_temp['Target'] == 'Dropout']
+                    declined_dropouts = (dropouts['Performance_Change'] < 0).sum()
+                    total_dropouts = len(dropouts)
+                    decline_rate = (declined_dropouts / total_dropouts * 100) if total_dropouts > 0 else 0
+
+                    st.metric(
+                        label="Dropouts Who Declined",
+                        value=f"{decline_rate:.1f}%",
+                        help="Percentage of dropouts who had worse grades in 2nd semester"
+                    )
+
+                with col3:
+                    # Average performance change
+                    avg_change = df_temp['Performance_Change'].mean()
+                    st.metric(
+                        label="Average Grade Change",
+                        value=f"{avg_change:+.2f}",
+                        help="Overall average change from 1st to 2nd semester"
+                    )
 
     elif choice == "Model Training & Evaluation":
         st.header("Model Training & Evaluation")
