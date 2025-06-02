@@ -10,6 +10,10 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Page configuration
 st.set_page_config(page_title="Student Dropout Prediction", page_icon="🎓", layout="wide")
@@ -23,46 +27,42 @@ TARGET_MAPPING = {
 
 
 # Fix for Data Quality Assessment alignment (around line 45-80)
+
+
 def display_enhanced_dataframe_info(df):
-    """Display enhanced and insightful dataframe information"""
+    """Display enhanced and insightful dataframe information with improved layout"""
     st.header("📊 Data Overview & Insights")
 
-    # Key metrics at the top
+    # Key metrics at the top with consistent styling
     col1, col2, col3, col4 = st.columns(4)
-
     with col1:
         st.metric("Total Students", f"{df.shape[0]:,}")
-
     with col2:
         dropout_rate = (df['Target'] == 'Dropout').sum() / len(df) * 100
         st.metric("Dropout Rate", f"{dropout_rate:.1f}%")
-
     with col3:
         graduate_rate = (df['Target'] == 'Graduate').sum() / len(df) * 100
         st.metric("Graduate Rate", f"{graduate_rate:.1f}%")
-
     with col4:
         missing_data_pct = df.isnull().sum().sum() / (df.shape[0] * df.shape[1]) * 100
         st.metric("Missing Data", f"{missing_data_pct:.1f}%")
 
-    # Data Quality Overview - FIXED ALIGNMENT
+    # Data Quality Overview - Improved alignment and consistent sizing
     st.subheader("🔍 Data Quality Assessment")
-
-    # Create two equal columns for better alignment
     col1, col2 = st.columns([1, 1])  # Equal width columns
 
     with col1:
         st.write("**Missing Data Analysis**")
-        # Missing data visualization
         missing_data = df.isnull().sum()
         missing_data = missing_data[missing_data > 0].sort_values(ascending=False)
 
         if len(missing_data) > 0:
-            fig, ax = plt.subplots(figsize=(8, 5))  # Adjusted figure size
+            fig, ax = plt.subplots(figsize=(6, 4))  # Standardized size
             missing_data.plot(kind='bar', ax=ax, color='coral')
-            ax.set_title('Missing Data by Column')
-            ax.set_ylabel('Number of Missing Values')
-            ax.set_xlabel('Columns')
+            ax.set_title('Missing Data by Column', fontsize=12, fontweight='bold')
+            ax.set_ylabel('Number of Missing Values', fontsize=10)
+            ax.set_xlabel('Columns', fontsize=10)
+            ax.tick_params(axis='both', labelsize=8)
             plt.xticks(rotation=45, ha='right')
             plt.tight_layout()
             st.pyplot(fig)
@@ -72,214 +72,173 @@ def display_enhanced_dataframe_info(df):
 
     with col2:
         st.write("**Data Types Distribution**")
-        # Data types distribution
         dtype_counts = df.dtypes.value_counts()
-        fig, ax = plt.subplots(figsize=(8, 5))  # Adjusted figure size
+        fig, ax = plt.subplots(figsize=(6, 4))  # Standardized size
         colors = ['skyblue', 'lightcoral', 'lightgreen', 'gold']
-        dtype_counts.plot(kind='pie', ax=ax, autopct='%1.1f%%', colors=colors[:len(dtype_counts)])
-        ax.set_title('Distribution of Data Types')
+        dtype_counts.plot(kind='pie', ax=ax, autopct='%1.1f%%', colors=colors[:len(dtype_counts)],
+                         textprops={'fontsize': 8})
+        ax.set_title('Distribution of Data Types', fontsize=12, fontweight='bold')
         ax.set_ylabel('')
         plt.tight_layout()
         st.pyplot(fig)
         plt.close()
 
-    # Student Demographics Insights - FIXED ALIGNMENT
+    # Student Demographics Insights - Improved alignment and consistent sizing
     st.subheader("👥 Student Demographics Insights")
-
-    # Create three equal columns for better alignment
     col1, col2, col3 = st.columns([1, 1, 1])  # Equal width columns
 
     with col1:
         st.write("**Age Distribution**")
-        # Age distribution
         if 'Age at enrollment' in df.columns:
-            fig, ax = plt.subplots(figsize=(6, 4))  # Consistent figure size
+            fig, ax = plt.subplots(figsize=(6, 4))  # Standardized size
             df['Age at enrollment'].hist(bins=20, ax=ax, color='lightblue', alpha=0.7, edgecolor='black')
             ax.axvline(df['Age at enrollment'].mean(), color='red', linestyle='--',
                        label=f'Mean: {df["Age at enrollment"].mean():.1f}')
-            ax.set_title('Age at Enrollment')
-            ax.set_xlabel('Age')
-            ax.set_ylabel('Count')
-            ax.legend()
+            ax.set_title('Age at Enrollment', fontsize=12, fontweight='bold')
+            ax.set_xlabel('Age', fontsize=10)
+            ax.set_ylabel('Count', fontsize=10)
+            ax.tick_params(axis='both', labelsize=8)
+            ax.legend(fontsize=8)
             plt.tight_layout()
             st.pyplot(fig)
             plt.close()
 
     with col2:
         st.write("**Gender Distribution**")
-        # Gender distribution
         if 'Gender' in df.columns:
             gender_counts = df['Gender'].value_counts()
             gender_labels = ['Female' if x == 0 else 'Male' for x in gender_counts.index]
-
-            fig, ax = plt.subplots(figsize=(6, 4))  # Consistent figure size
+            fig, ax = plt.subplots(figsize=(6, 4))  # Standardized size
             ax.pie(gender_counts.values, labels=gender_labels, autopct='%1.1f%%',
-                   colors=['pink', 'lightblue'])
-            ax.set_title('Gender Distribution')
+                   colors=['pink', 'lightblue'], textprops={'fontsize': 8})
+            ax.set_title('Gender Distribution', fontsize=12, fontweight='bold')
             plt.tight_layout()
             st.pyplot(fig)
             plt.close()
 
     with col3:
         st.write("**Scholarship Distribution**")
-        # Scholarship distribution
         if 'Scholarship holder' in df.columns:
             scholarship_counts = df['Scholarship holder'].value_counts()
             scholarship_labels = ['No Scholarship' if x == 0 else 'Scholarship' for x in scholarship_counts.index]
-
-            fig, ax = plt.subplots(figsize=(6, 4))  # Consistent figure size
+            fig, ax = plt.subplots(figsize=(6, 4))  # Standardized size
             ax.pie(scholarship_counts.values, labels=scholarship_labels, autopct='%1.1f%%',
-                   colors=['lightcoral', 'lightgreen'])
-            ax.set_title('Scholarship Status')
+                   colors=['lightcoral', 'lightgreen'], textprops={'fontsize': 8})
+            ax.set_title('Scholarship Status', fontsize=12, fontweight='bold')
             plt.tight_layout()
             st.pyplot(fig)
             plt.close()
 
-    # Continue with the rest of the function...
-    # Academic Performance Overview - SIMPLIFIED AND USER-FRIENDLY
+    # Academic Performance Overview
     st.subheader("📚 Academic Performance Overview")
-
-    # Add explanation for the audience
-    st.info(
-        "💡 **What this shows:** How well students performed academically and how it relates to their final outcome (Graduate/Dropout)")
-
-    col1, col2 = st.columns(2)
+    st.info("💡 **What this shows:** How well students performed academically and how it relates to their final outcome (Graduate/Dropout)")
+    col1, col2 = st.columns([1, 1])
 
     with col1:
-        st.write("**Admission Grades vs Final Outcome**")
+        st.write("** Admission Grades vs Final Outcome**")
         st.caption("Shows how entrance exam scores relate to student success")
-
-        # Admission grades distribution by outcome
         if 'Admission grade' in df.columns:
-            fig, ax = plt.subplots(figsize=(8, 5))
-
-            # Create cleaner visualization with better colors and labels
+            fig, ax = plt.subplots(figsize=(6, 4))  # Standardized size
             colors = {'Graduate': 'green', 'Dropout': 'red', 'Enrolled': 'orange'}
             for outcome in df['Target'].unique():
                 subset = df[df['Target'] == outcome]['Admission grade']
                 ax.hist(subset, alpha=0.6, label=f'{outcome} ({len(subset)} students)',
                         bins=15, color=colors.get(outcome, 'gray'))
-
-            ax.set_title('Admission Grade Distribution by Student Outcome', fontweight='bold')
-            ax.set_xlabel('Admission Grade (Higher = Better)')
-            ax.set_ylabel('Number of Students')
-            ax.legend()
+            ax.set_title('Admission Grade by Outcome', fontsize=12, fontweight='bold')
+            ax.set_xlabel('Admission Grade', fontsize=10)
+            ax.set_ylabel('Number of Students', fontsize=10)
+            ax.legend(fontsize=8)
             ax.grid(True, alpha=0.3)
+            ax.tick_params(axis='both', labelsize=8)
             plt.tight_layout()
             st.pyplot(fig)
             plt.close()
-
-            # Add interpretation
             st.caption("📊 **Key Insight:** Students with higher admission grades are more likely to graduate")
 
     with col2:
         st.write("**First Semester Performance vs Final Outcome**")
         st.caption("Shows how first semester grades predict student success")
-
-        # First semester performance
         if 'Curricular units 1st sem (grade)' in df.columns:
-            fig, ax = plt.subplots(figsize=(8, 5))
-
+            fig, ax = plt.subplots(figsize=(6, 4))  # Standardized size
             colors = {'Graduate': 'green', 'Dropout': 'red', 'Enrolled': 'orange'}
             for outcome in df['Target'].unique():
                 subset = df[df['Target'] == outcome]['Curricular units 1st sem (grade)']
                 ax.hist(subset, alpha=0.6, label=f'{outcome} ({len(subset)} students)',
                         bins=15, color=colors.get(outcome, 'gray'))
-
-            ax.set_title('1st Semester Grade Distribution by Student Outcome', fontweight='bold')
-            ax.set_xlabel('Average Grade (0-20 scale)')
-            ax.set_ylabel('Number of Students')
-            ax.legend()
+            ax.set_title('1st Semester Grade by Outcome', fontsize=12, fontweight='bold')
+            ax.set_xlabel('Average Grade (0-20)', fontsize=10)
+            ax.set_ylabel('Number of Students', fontsize=10)
+            ax.legend(fontsize=8)
             ax.grid(True, alpha=0.3)
+            ax.tick_params(axis='both', labelsize=8)
             plt.tight_layout()
             st.pyplot(fig)
             plt.close()
-
-            # Add interpretation
             st.caption("📊 **Key Insight:** Strong first semester performance is crucial for graduation")
 
-    # Add summary statistics in a user-friendly format
+    # Performance Summary
     if 'Admission grade' in df.columns and 'Curricular units 1st sem (grade)' in df.columns:
         st.subheader("📈 Performance Summary")
-
-        # Create summary table
         summary_col1, summary_col2, summary_col3 = st.columns(3)
-
         with summary_col1:
             st.metric(
                 label="Average Admission Grade (Graduates)",
                 value=f"{df[df['Target'] == 'Graduate']['Admission grade'].mean():.1f}",
                 delta=f"{df[df['Target'] == 'Graduate']['Admission grade'].mean() - df[df['Target'] == 'Dropout']['Admission grade'].mean():.1f} vs Dropouts"
             )
-
         with summary_col2:
             st.metric(
                 label="Average 1st Sem Grade (Graduates)",
                 value=f"{df[df['Target'] == 'Graduate']['Curricular units 1st sem (grade)'].mean():.1f}",
                 delta=f"{df[df['Target'] == 'Graduate']['Curricular units 1st sem (grade)'].mean() - df[df['Target'] == 'Dropout']['Curricular units 1st sem (grade)'].mean():.1f} vs Dropouts"
             )
-
         with summary_col3:
-            # Calculate success rate for high performers
             high_performers = df[df['Curricular units 1st sem (grade)'] > 15]
             success_rate = (high_performers['Target'] == 'Graduate').mean() * 100 if len(high_performers) > 0 else 0
             st.metric(
                 label="Success Rate (Grade >15)",
                 value=f"{success_rate:.1f}%"
             )
+
     # Key Risk Factors Analysis
     st.subheader("⚠️ Key Risk Factors Analysis")
-
     risk_factors = []
-
-    # Calculate various risk indicators
     if 'Curricular units 1st sem (approved)' in df.columns:
         low_performance = df['Curricular units 1st sem (approved)'] <= 2
         risk_factors.append(('Low 1st Sem Performance (≤2 units)', low_performance.sum()))
-
     if 'Age at enrollment' in df.columns:
         mature_students = df['Age at enrollment'] > 25
         risk_factors.append(('Mature Students (>25 years)', mature_students.sum()))
-
     if 'Scholarship holder' in df.columns:
         no_scholarship = df['Scholarship holder'] == 0
         risk_factors.append(('No Financial Aid', no_scholarship.sum()))
-
     if 'Displaced' in df.columns:
         displaced = df['Displaced'] == 1
         risk_factors.append(('Displaced Students', displaced.sum()))
 
     if risk_factors:
         risk_df = pd.DataFrame(risk_factors, columns=['Risk Factor', 'Number of Students'])
-
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = plt.subplots(figsize=(6, 4))  # Standardized size
         bars = ax.bar(risk_df['Risk Factor'], risk_df['Number of Students'],
                       color=['red', 'orange', 'yellow', 'coral'][:len(risk_factors)])
-        ax.set_title('Number of Students by Risk Factor')
-        ax.set_ylabel('Number of Students')
+        ax.set_title('Students by Risk Factor', fontsize=12, fontweight='bold')
+        ax.set_ylabel('Number of Students', fontsize=10)
+        ax.tick_params(axis='both', labelsize=8)
         plt.xticks(rotation=45, ha='right')
-
-        # Add value labels on bars
         for bar in bars:
             height = bar.get_height()
             ax.text(bar.get_x() + bar.get_width() / 2., height,
-                    f'{int(height)}', ha='center', va='bottom')
-
+                    f'{int(height)}', ha='center', va='bottom', fontsize=8)
         plt.tight_layout()
         st.pyplot(fig)
+        plt.close()
 
     # Sample Data Preview with Context
     st.subheader("📋 Data Sample & Structure")
-
-    # Enhanced data preview
     col1, col2 = st.columns([2, 1])
-
     with col1:
         st.write("**Sample of Student Records:**")
-        # Show more meaningful sample
         sample_df = df.head(10)
-
-        # Add outcome colors - FIXED: Use .map() instead of .applymap()
         def highlight_outcome(val):
             if val == 'Dropout':
                 return 'background-color: #ffcccc'
@@ -287,21 +246,15 @@ def display_enhanced_dataframe_info(df):
                 return 'background-color: #ccffcc'
             else:
                 return 'background-color: #ffffcc'
-
-        # Use .map() instead of .applymap() for single column styling
         styled_df = sample_df.style.map(highlight_outcome, subset=['Target'])
         st.dataframe(styled_df)
-
     with col2:
         st.write("**Dataset Composition:**")
         st.write(f"• **Rows:** {df.shape[0]:,} students")
         st.write(f"• **Columns:** {df.shape[1]} features")
-
-        # Feature categories
         demographic_cols = ['Gender', 'Age at enrollment', 'Marital status', 'Nacionality']
         academic_cols = [col for col in df.columns if 'grade' in col.lower() or 'units' in col.lower()]
         economic_cols = ['Unemployment rate', 'Inflation rate', 'GDP']
-
         st.write("**Feature Categories:**")
         st.write(f"• Demographics: {len([c for c in demographic_cols if c in df.columns])}")
         st.write(f"• Academic: {len([c for c in academic_cols if c in df.columns])}")
@@ -311,18 +264,13 @@ def display_enhanced_dataframe_info(df):
 
     # Interactive Feature Explorer
     st.subheader("🔧 Interactive Feature Explorer")
-
-    # Allow users to explore specific columns
     col_to_explore = st.selectbox(
         "Select a feature to explore in detail:",
         options=[col for col in df.columns if col != 'Target' and col != 'id']
     )
-
     if col_to_explore:
-        col1, col2 = st.columns(2)
-
+        col1, col2 = st.columns([1, 1])
         with col1:
-            # Basic statistics
             st.write(f"**Statistics for {col_to_explore}:**")
             if df[col_to_explore].dtype in ['int64', 'float64']:
                 stats = df[col_to_explore].describe()
@@ -332,37 +280,29 @@ def display_enhanced_dataframe_info(df):
                 unique_vals = df[col_to_explore].nunique()
                 st.write(f"• **Unique values:** {unique_vals}")
                 st.write(f"• **Most common:** {df[col_to_explore].mode().iloc[0]}")
-
         with col2:
-            # Relationship with target
             st.write(f"**{col_to_explore} vs Dropout Rate:**")
             if df[col_to_explore].dtype in ['int64', 'float64']:
-                # For numeric columns, show correlation
-                correlation = df[col_to_explore].corr(df['Target'].map(TARGET_MAPPING))
+                correlation = df[col_to_explore].corr(df['Target'].map({'Graduate': 1, 'Dropout': 0, 'Enrolled': 2}))
                 st.write(f"• **Correlation with dropout:** {correlation:.3f}")
-
-                # Create bins for better visualization - FIXED: Handle division by zero
                 df_temp = df.copy()
                 try:
                     df_temp[f'{col_to_explore}_binned'] = pd.cut(df_temp[col_to_explore], bins=5)
                     dropout_by_bin = df_temp.groupby(f'{col_to_explore}_binned', observed=True)['Target'].apply(
                         lambda x: (x == 'Dropout').mean() * 100 if len(x) > 0 else 0
                     ).round(1)
-
                     for bin_range, dropout_rate in dropout_by_bin.items():
                         st.write(f"• **{bin_range}:** {dropout_rate:.1f}% dropout rate")
                 except Exception as e:
                     st.write(f"• Unable to create bins for this feature: {str(e)}")
             else:
-                # For categorical columns - FIXED: Add observed=True
                 dropout_by_cat = df.groupby(col_to_explore, observed=True)['Target'].apply(
                     lambda x: (x == 'Dropout').mean() * 100 if len(x) > 0 else 0
                 ).round(1)
-
                 for category, dropout_rate in dropout_by_cat.items():
                     st.write(f"• **{category}:** {dropout_rate:.1f}% dropout rate")
 
-    # Expandable detailed column information
+    # Expandable Detailed Column Information
     with st.expander("📋 Detailed Column Information"):
         column_info = pd.DataFrame({
             'Column Name': df.columns,
@@ -372,8 +312,6 @@ def display_enhanced_dataframe_info(df):
             'Null Percentage': (df.isnull().sum() / len(df) * 100).round(2),
             'Unique Values': df.nunique()
         })
-
-        # Add interpretation column
         def interpret_column(row):
             if row['Null Percentage'] > 10:
                 return "⚠️ High missing data"
@@ -385,10 +323,8 @@ def display_enhanced_dataframe_info(df):
                 return "📊 Categorical"
             else:
                 return "📈 Continuous"
-
         column_info['Interpretation'] = column_info.apply(interpret_column, axis=1)
         st.dataframe(column_info)
-
 
 def load_data(uploaded_file=None):
     """Load data from file or sample dataset"""
@@ -751,61 +687,118 @@ def individual_dropout_prediction(model, X):
 
 
 def visualize_model_results(model, X_test, y_test):
-    """Visualize model evaluation results"""
+    """Visualize model evaluation results with improved layout and smaller graphs"""
+    st.subheader("Model Evaluation Results")
+
     # Get predictions
     y_pred = model.predict(X_test)
     y_proba = model.predict_proba(X_test)
 
-    # Get accuracy
-    accuracy = accuracy_score(y_test, y_pred)
-
     # Display accuracy with a metric
+    accuracy = accuracy_score(y_test, y_pred)
     st.metric("Model Accuracy", f"{accuracy:.2%}")
 
-    # Create tabs for different visualizations
-    tabs = st.tabs(["Classification Report", "Confusion Matrix", "Feature Importance"])
+    # Option to choose display mode: Tabs or Panels
+    display_mode = st.radio("Select display mode:", ["Tabs", "Panels"], index=1)
 
-    with tabs[0]:
-        # Classification Report
-        st.subheader("Classification Report")
+    if display_mode == "Tabs":
+        # Original tab-based layout
+        tabs = st.tabs(["Classification Report", "Confusion Matrix", "Feature Importance"])
+
+        with tabs[0]:
+            st.write("**Classification Report**")
+            report = classification_report(y_test, y_pred, output_dict=True)
+            report_df = pd.DataFrame(report).transpose()
+            st.dataframe(report_df)
+
+        with tabs[1]:
+            st.write("**Confusion Matrix**")
+            cm = confusion_matrix(y_test, y_pred)
+            fig, ax = plt.subplots(figsize=(6, 4))  # Smaller size
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax,
+                        annot_kws={"size": 8}, cbar_kws={"shrink": 0.8})
+
+            # Map numeric classes to labels
+            reverse_mapping = {0: 'Dropout', 1: 'Graduate', 2: 'Enrolled'}
+            class_labels = [reverse_mapping.get(c, f"Class {c}") for c in sorted(np.unique(y_test))]
+
+            ax.set_title('Confusion Matrix', fontsize=12, fontweight='bold')
+            ax.set_ylabel('Actual', fontsize=10)
+            ax.set_xlabel('Predicted', fontsize=10)
+            ax.set_xticklabels(class_labels, fontsize=8, rotation=45, ha='right')
+            ax.set_yticklabels(class_labels, fontsize=8)
+            plt.tight_layout()
+            st.pyplot(fig)
+            plt.close()
+
+        with tabs[2]:
+            st.write("**Feature Importance**")
+            feature_importance = pd.DataFrame({
+                'Feature': X_test.columns,
+                'Importance': model.feature_importances_
+            }).sort_values('Importance', ascending=False)
+
+            fig, ax = plt.subplots(figsize=(6, 4))  # Smaller size
+            top_features = feature_importance.head(15)  # Show top 15 features
+            sns.barplot(x='Importance', y='Feature', data=top_features, ax=ax, color='skyblue')
+            ax.set_title('Top 15 Feature Importances', fontsize=12, fontweight='bold')
+            ax.set_xlabel('Importance', fontsize=10)
+            ax.set_ylabel('Feature', fontsize=10)
+            ax.tick_params(axis='both', labelsize=8)
+            plt.tight_layout()
+            st.pyplot(fig)
+            plt.close()
+
+    else:
+        # Panel-based layout
+        st.write("**Model Evaluation Panels**")
+
+        # Classification Report as a table
+        st.write("**Classification Report**")
         report = classification_report(y_test, y_pred, output_dict=True)
         report_df = pd.DataFrame(report).transpose()
         st.dataframe(report_df)
 
-    with tabs[1]:
-        # Confusion Matrix
-        st.subheader("Confusion Matrix")
-        cm = confusion_matrix(y_test, y_pred)
+        # Create two columns for Confusion Matrix and Feature Importance
+        col1, col2 = st.columns([1, 1])
 
-        fig, ax = plt.subplots(figsize=(8, 6))
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
+        with col1:
+            st.write("**Confusion Matrix**")
+            cm = confusion_matrix(y_test, y_pred)
+            fig, ax = plt.subplots(figsize=(6, 4))  # Smaller size
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax,
+                        annot_kws={"size": 8}, cbar_kws={"shrink": 0.8})
 
-        # Map numeric classes to labels
-        reverse_mapping = {v: k for k, v in TARGET_MAPPING.items()}
-        class_labels = [reverse_mapping.get(c, f"Class {c}") for c in sorted(np.unique(y_test))]
+            # Map numeric classes to labels
+            reverse_mapping = {0: 'Dropout', 1: 'Graduate', 2: 'Enrolled'}
+            class_labels = [reverse_mapping.get(c, f"Class {c}") for c in sorted(np.unique(y_test))]
 
-        ax.set_title('Confusion Matrix')
-        ax.set_ylabel('Actual')
-        ax.set_xlabel('Predicted')
-        ax.set_xticklabels(class_labels)
-        ax.set_yticklabels(class_labels)
-        st.pyplot(fig)
+            ax.set_title('Confusion Matrix', fontsize=12, fontweight='bold')
+            ax.set_ylabel('Actual', fontsize=10)
+            ax.set_xlabel('Predicted', fontsize=10)
+            ax.set_xticklabels(class_labels, fontsize=8, rotation=45, ha='right')
+            ax.set_yticklabels(class_labels, fontsize=8)
+            plt.tight_layout()
+            st.pyplot(fig)
+            plt.close()
 
-    with tabs[2]:
-        # Feature Importance
-        st.subheader("Feature Importance")
+        with col2:
+            st.write("**Feature Importance**")
+            feature_importance = pd.DataFrame({
+                'Feature': X_test.columns,
+                'Importance': model.feature_importances_
+            }).sort_values('Importance', ascending=False)
 
-        feature_importance = pd.DataFrame({
-            'Feature': X_test.columns,
-            'Importance': model.feature_importances_
-        }).sort_values('Importance', ascending=False)
-
-        fig, ax = plt.subplots(figsize=(10, 8))
-        top_features = feature_importance.head(15)  # Show top 15 features
-        sns.barplot(x='Importance', y='Feature', data=top_features, ax=ax)
-        ax.set_title('Top 15 Feature Importances')
-        plt.tight_layout()
-        st.pyplot(fig)
+            fig, ax = plt.subplots(figsize=(6, 4))  # Smaller size
+            top_features = feature_importance.head(15)  # Show top 15 features
+            sns.barplot(x='Importance', y='Feature', data=top_features, ax=ax, color='skyblue')
+            ax.set_title('Top 15 Feature Importances', fontsize=12, fontweight='bold')
+            ax.set_xlabel('Importance', fontsize=10)
+            ax.set_ylabel('Feature', fontsize=10)
+            ax.tick_params(axis='both', labelsize=8)
+            plt.tight_layout()
+            st.pyplot(fig)
+            plt.close()
 
 
 def main():
