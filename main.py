@@ -20,11 +20,11 @@ TARGET_MAPPING = {
 
 def display_data_quality(df):
     """Display data quality assessment with labeled charts and insights"""
-    st.markdown("<h2 style='font-size: 28px; font-weight: bold;'>🔍 Data Quality Assessment</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='font-size: 20px; font-weight: bold;'>🔍 Data Quality Assessment</h2>", unsafe_allow_html=True)
     col1, col2 = st.columns([1, 1])
 
     with col1:
-        st.markdown("<h3 style='font-size: 20px;'>Missing Data by Column</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='font-size: 16px;'>Missing Data by Column</h3>", unsafe_allow_html=True)
         missing_data = df.isnull().sum()
         missing_data = missing_data[missing_data > 0].sort_values(ascending=False)
         if len(missing_data) > 0:
@@ -50,7 +50,7 @@ def display_data_quality(df):
             st.markdown("**Insight**: The dataset is complete, ensuring robust analysis without the need for imputation.", unsafe_allow_html=True)
 
     with col2:
-        st.markdown("<h3 style='font-size: 20px;'>Distribution of Data Types</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='font-size: 16px;'>Distribution of Data Types</h3>", unsafe_allow_html=True)
         dtype_counts = df.dtypes.value_counts()
         fig, ax = plt.subplots(figsize=(8, 5))
         colors = ['skyblue', 'lightcoral', 'lightgreen', 'gold']
@@ -65,11 +65,11 @@ def display_data_quality(df):
 
 def display_demographics(df):
     """Display student demographics insights with labeled charts and insights"""
-    st.markdown("<h2 style='font-size: 28px; font-weight: bold;'>👥 Student Demographics Insights</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='font-size: 20px; font-weight: bold;'>👥 Student Demographics Insights</h2>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 1, 1])
 
     with col1:
-        st.markdown("<h3 style='font-size: 20px;'>Age Distribution at Enrollment</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='font-size: 16px;'>Age Distribution at Enrollment</h3>", unsafe_allow_html=True)
         if 'Age at enrollment' in df.columns:
             fig, ax = plt.subplots(figsize=(8, 5))
             df['Age at enrollment'].hist(bins=20, ax=ax, color='lightblue', alpha=0.7, edgecolor='black')
@@ -87,7 +87,7 @@ def display_demographics(df):
             plt.close()
 
     with col2:
-        st.markdown("<h3 style='font-size: 20px;'>Gender Distribution</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='font-size: 16px;'>Gender Distribution</h3>", unsafe_allow_html=True)
         if 'Gender' in df.columns:
             gender_counts = df['Gender'].value_counts()
             gender_labels = ['Female' if x == 0 else 'Male' for x in gender_counts.index]
@@ -101,7 +101,7 @@ def display_demographics(df):
             plt.close()
 
     with col3:
-        st.markdown("<h3 style='font-size: 20px;'>Scholarship Status</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='font-size: 16px;'>Scholarship Status</h3>", unsafe_allow_html=True)
         if 'Scholarship holder' in df.columns:
             scholarship_counts = df['Scholarship holder'].value_counts()
             scholarship_labels = ['No Scholarship' if x == 0 else 'Scholarship' for x in scholarship_counts.index]
@@ -116,12 +116,12 @@ def display_demographics(df):
 
 def display_academic_performance(df):
     """Display academic performance overview with labeled charts and insights"""
-    st.markdown("<h2 style='font-size: 28px; font-weight: bold;'>📚 Academic Performance Overview</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='font-size: 20px; font-weight: bold;'>📚 Academic Performance Overview</h2>", unsafe_allow_html=True)
     st.info("💡 **What this shows:** How well students performed academically and how it relates to their final outcome")
     col1, col2 = st.columns([1, 1])
 
     with col1:
-        st.markdown("<h3 style='font-size: 20px;'>Admission Grades by Outcome</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='font-size: 16px;'>Admission Grades by Outcome</h3>", unsafe_allow_html=True)
         if 'Admission grade' in df.columns:
             fig, ax = plt.subplots(figsize=(8, 5))
             colors = {'Graduate': 'green', 'Dropout': 'red', 'Enrolled': 'orange'}
@@ -144,7 +144,7 @@ def display_academic_performance(df):
             plt.close()
 
     with col2:
-        st.markdown("<h3 style='font-size: 20px;'>First Semester Grades by Outcome</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='font-size: 16px;'>First Semester Grades by Outcome</h3>", unsafe_allow_html=True)
         if 'Curricular units 1st sem (grade)' in df.columns:
             fig, ax = plt.subplots(figsize=(8, 5))
             colors = {'Graduate': 'green', 'Dropout': 'red', 'Enrolled': 'orange'}
@@ -168,7 +168,7 @@ def display_academic_performance(df):
 
 def display_performance_summary(df):
     """Display performance summary metrics"""
-    st.markdown("<h2 style='font-size: 28px; font-weight: bold;'>📈 Performance Summary</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='font-size: 20px; font-weight: bold;'>📈 Performance Summary</h2>", unsafe_allow_html=True)
     if 'Admission grade' in df.columns and 'Curricular units 1st sem (grade)' in df.columns:
         summary_col1, summary_col2, summary_col3 = st.columns(3)
         with summary_col1:
@@ -194,7 +194,7 @@ def display_performance_summary(df):
 
 def display_risk_factors(df):
     """Display key risk factors analysis with labeled charts and insights"""
-    st.markdown("<h2 style='font-size: 28px; font-weight: bold;'>⚠️ Key Risk Factors Analysis</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='font-size: 20px; font-weight: bold;'>⚠️ Key Risk Factors Analysis</h2>", unsafe_allow_html=True)
     risk_factors = []
     if 'Curricular units 1st sem (approved)' in df.columns:
         low_performance = df['Curricular units 1st sem (approved)'] <= 2
@@ -222,7 +222,7 @@ def display_risk_factors(df):
         for bar in bars:
             height = bar.get_height()
             ax.text(bar.get_x() + bar.get_width() / 2., height,
-                   f'{int(height)}', ha="center", va='bottom', fontsize=10)
+                   f'{int(height)}', ha='center', va='bottom', fontsize=10)
         plt.tight_layout()
         st.pyplot(fig)
         st.markdown("**Insight**: Risk factors like low academic performance and lack of financial aid significantly increase dropout probability.", unsafe_allow_html=True)
@@ -230,10 +230,10 @@ def display_risk_factors(df):
 
 def display_data_structure(df):
     """Display data sample and structure"""
-    st.markdown("<h2 style='font-size: 28px; font-weight: bold;'>📋 Data Sample & Structure</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='font-size: 20px; font-weight: bold;'>📋 Data Sample & Structure</h2>", unsafe_allow_html=True)
     col1, col2 = st.columns([2, 1])
     with col1:
-        st.markdown("<h3 style='font-size: 20px;'>Sample of Student Records</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='font-size: 16px;'>Sample of Student Records</h3>", unsafe_allow_html=True)
         sample_df = df.head(10)
         def highlight_outcome(val):
             if val == 'Dropout':
@@ -246,7 +246,7 @@ def display_data_structure(df):
         st.dataframe(styled_df)
         st.markdown("**Insight**: This sample shows key student attributes, with outcomes highlighted for quick reference.", unsafe_allow_html=True)
     with col2:
-        st.markdown("<h3 style='font-size: 20px;'>Dataset Composition</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='font-size: 16px;'>Dataset Composition</h3>", unsafe_allow_html=True)
         st.write(f"• **Rows:** {df.shape[0]:,} students")
         st.write(f"• **Columns:** {df.shape[1]} features")
         demographic_cols = ['Gender', 'Age at enrollment', 'Marital status', 'Nacionality']
@@ -262,7 +262,7 @@ def display_data_structure(df):
 
 def display_feature_explorer(df):
     """Interactive feature explorer with labeled insights"""
-    st.markdown("<h2 style='font-size: 28px; font-weight: bold;'>🔧 Interactive Feature Explorer</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='font-size: 20px; font-weight: bold;'>🔧 Interactive Feature Explorer</h2>", unsafe_allow_html=True)
     col_to_explore = st.selectbox(
         "Select a feature to explore in detail:",
         options=[col for col in df.columns if col != 'Target' and col != 'id']
@@ -270,7 +270,7 @@ def display_feature_explorer(df):
     if col_to_explore:
         col1, col2 = st.columns([1, 1])
         with col1:
-            st.markdown(f"<h3 style='font-size: 20px;'>Statistics for {col_to_explore}</h3>", unsafe_allow_html=True)
+            st.markdown(f"<h3 style='font-size: 16px;'>Statistics for {col_to_explore}</h3>", unsafe_allow_html=True)
             if df[col_to_explore].dtype in ['int64', 'float64']:
                 stats = df[col_to_explore].describe()
                 for stat, value in stats.items():
@@ -282,7 +282,7 @@ def display_feature_explorer(df):
                 st.write(f"• **Most common:** {df[col_to_explore].mode().iloc[0]}")
                 st.markdown(f"**Insight**: Categorical feature with {unique_vals} unique values, indicating diversity in {col_to_explore}.", unsafe_allow_html=True)
         with col2:
-            st.markdown(f"<h3 style='font-size: 20px;'>{col_to_explore} vs Dropout Rate</h3>", unsafe_allow_html=True)
+            st.markdown(f"<h3 style='font-size: 16px;'>{col_to_explore} vs Dropout Rate</h3>", unsafe_allow_html=True)
             if df[col_to_explore].dtype in ['int64', 'float64']:
                 correlation = df[col_to_explore].corr(df['Target'].map({'Graduate': 1, 'Dropout': 0, 'Enrolled': 2}))
                 st.write(f"• **Correlation with dropout:** {correlation:.3f}")
@@ -323,7 +323,6 @@ def display_feature_explorer(df):
 
 def display_column_info(df):
     """Display detailed column information"""
-    st.markdown("<h2 style='font-size: 28px; font-weight: bold;'>📋 Detailed Column Information</h2>", unsafe_allow_html=True)
     with st.expander("📋 Detailed Column Information"):
         column_info = pd.DataFrame({
             'Column Name': df.columns,
@@ -462,16 +461,16 @@ def train_model(X_train, y_train):
 
 def individual_dropout_prediction(model, X):
     """Create interactive widgets for individual dropout prediction"""
-    st.markdown("<h2 style='font-size: 28px; font-weight: bold;'>Student Dropout Probability Predictor</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='font-size: 20px; font-weight: bold;'>Student Dropout Probability Predictor</h2>", unsafe_allow_html=True)
     show_debug = st.checkbox("Show debug information")
     if show_debug:
-        st.markdown("<h3 style='font-size: 20px;'>Model Information</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='font-size: 16px;'>Model Information</h3>", unsafe_allow_html=True)
         st.write("Model Classes:", model.classes_)
         reverse_mapping = {v: k for k, v in TARGET_MAPPING.items()}
         st.write("Class mapping:", {f"Class {k}": reverse_mapping.get(k, f"Unknown-{k}") for k in model.classes_})
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.markdown("<h3 style='font-size: 20px;'>Demographics</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='font-size: 16px;'>Demographics</h3>", unsafe_allow_html=True)
         gender = st.selectbox("Gender", ["Female", "Male"])
         age = st.slider("Age at enrollment", min_value=17, max_value=70, value=20)
         marital_status = st.selectbox("Marital status", [1, 2, 3, 4, 5, 6])
@@ -480,7 +479,7 @@ def individual_dropout_prediction(model, X):
         educational_needs = st.selectbox("Educational special needs", [0, 1])
         scholarship = st.selectbox("Scholarship holder", [0, 1])
     with col2:
-        st.markdown("<h3 style='font-size: 20px;'>Academic Background</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='font-size: 16px;'>Academic Background</h3>", unsafe_allow_html=True)
         application_mode = st.selectbox("Application mode", list(range(1, 18)))
         application_order = st.slider("Application order", min_value=1, max_value=9, value=1)
         course = st.number_input("Course Code", min_value=9000, max_value=9999, value=9238)
@@ -489,12 +488,12 @@ def individual_dropout_prediction(model, X):
         prev_grade = st.slider("Previous qualification grade", min_value=0.0, max_value=200.0, value=120.0, step=5.0)
         admission_grade = st.slider("Admission grade", min_value=0.0, max_value=200.0, value=120.0, step=5.0)
     with col3:
-        st.markdown("<h3 style='font-size: 20px;'>Academic Performance</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='font-size: 16px;'>Academic Performance</h3>", unsafe_allow_html=True)
         units_1st_approved = st.slider("Units approved (1st sem)", min_value=0, max_value=20, value=5)
         units_1st_grade = st.slider("Average grade (1st sem)", min_value=0.0, max_value=20.0, value=12.0, step=1.0)
         units_2nd_approved = st.slider("Units approved (2nd sem)", min_value=0, max_value=20, value=5)
         units_2nd_grade = st.slider("Average grade (2nd sem)", min_value=0.0, max_value=20.0, value=12.0, step=1.0)
-    st.markdown("<h3 style='font-size: 20px;'>Economic Indicators</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='font-size: 16px;'>Economic Indicators</h3>", unsafe_allow_html=True)
     eco_col1, eco_col2, eco_col3 = st.columns(3)
     with eco_col1:
         unemployment = st.slider("Unemployment rate", min_value=0.0, max_value=20.0, value=11.0, step=1.0)
@@ -521,7 +520,7 @@ def individual_dropout_prediction(model, X):
     }
     show_advanced = st.checkbox("Show advanced options")
     if show_advanced:
-        st.markdown("<h3 style='font-size: 20px;'>Advanced Features</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='font-size: 16px;'>Advanced Features</h3>", unsafe_allow_html=True)
         col_adv1, col_adv2 = st.columns(2)
         with col_adv1:
             for key in list(default_values.keys())[:len(default_values) // 2]:
@@ -561,7 +560,7 @@ def individual_dropout_prediction(model, X):
                 input_dict[key] = value
             input_data = pd.DataFrame([input_dict])
             if show_debug:
-                st.markdown("<h3 style='font-size: 20px;'>Debug Information</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 style='font-size: 16px;'>Debug Information</h3>", unsafe_allow_html=True)
                 st.write("Raw Input Data:")
                 st.write(input_data)
             try:
@@ -577,7 +576,7 @@ def individual_dropout_prediction(model, X):
                     'Probability': [f"{p * 100:.2f}%" for p in prediction_probs],
                     'Raw Value': prediction_probs
                 })
-                st.markdown("<h3 style='font-size: 20px;'>Prediction Results</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 style='font-size: 16px;'>Prediction Results</h3>", unsafe_allow_html=True)
                 st.dataframe(results)
                 for outcome, prob in zip(class_names, prediction_probs):
                     st.write(f"{outcome}: {prob:.2%}")
@@ -585,7 +584,7 @@ def individual_dropout_prediction(model, X):
                 max_class_idx = np.argmax(prediction_probs)
                 max_class_name = class_names[max_class_idx]
                 max_prob = prediction_probs[max_class_idx]
-                st.markdown("<h3 style='font-size: 20px;'>Prediction Summary</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 style='font-size: 16px;'>Prediction Summary</h3>", unsafe_allow_html=True)
                 if max_class_name == "Dropout":
                     st.warning(f"⚠️ Risk of student dropout detected! Probability: {max_prob:.2%}")
                     st.write("Recommended actions:")
@@ -606,7 +605,7 @@ def individual_dropout_prediction(model, X):
 
 def visualize_model_results(model, X_test, y_test):
     """Visualize model evaluation results with labeled charts and insights"""
-    st.markdown("<h2 style='font-size: 28px; font-weight: bold;'>Model Evaluation Results</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='font-size: 20px; font-weight: bold;'>Model Evaluation Results</h2>", unsafe_allow_html=True)
     y_pred = model.predict(X_test)
     accuracy = accuracy_score(y_test, y_pred)
     st.metric("Model Accuracy", f"{accuracy:.2%}")
@@ -615,13 +614,13 @@ def visualize_model_results(model, X_test, y_test):
     if display_mode == "Tabs":
         tabs = st.tabs(["Classification Report", "Confusion Matrix", "Feature Importance"])
         with tabs[0]:
-            st.markdown("<h3 style='font-size: 20px;'>Classification Report</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='font-size: 16px;'>Classification Report</h3>", unsafe_allow_html=True)
             report = classification_report(y_test, y_pred, output_dict=True)
             report_df = pd.DataFrame(report).transpose()
             st.dataframe(report_df)
             st.markdown("**Insight**: Precision, recall, and F1-scores show the model's performance across Graduate, Dropout, and Enrolled classes.", unsafe_allow_html=True)
         with tabs[1]:
-            st.markdown("<h3 style='font-size: 20px;'>Confusion Matrix</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='font-size: 16px;'>Confusion Matrix</h3>", unsafe_allow_html=True)
             cm = confusion_matrix(y_test, y_pred)
             fig, ax = plt.subplots(figsize=(8, 5))
             sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax,
@@ -638,7 +637,7 @@ def visualize_model_results(model, X_test, y_test):
             st.markdown("**Insight**: The matrix shows correct and incorrect predictions, with higher diagonal values indicating better performance.", unsafe_allow_html=True)
             plt.close()
         with tabs[2]:
-            st.markdown("<h3 style='font-size: 20px;'>Feature Importance</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='font-size: 16px;'>Feature Importance</h3>", unsafe_allow_html=True)
             feature_importance = pd.DataFrame({
                 'Feature': X_test.columns,
                 'Importance': model.feature_importances_
@@ -655,14 +654,14 @@ def visualize_model_results(model, X_test, y_test):
             st.markdown("**Insight**: Features like first-semester grades and units approved are critical drivers of the model's predictions.", unsafe_allow_html=True)
             plt.close()
     else:
-        st.markdown("<h3 style='font-size: 20px;'>Classification Report</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='font-size: 16px;'>Classification Report</h3>", unsafe_allow_html=True)
         report = classification_report(y_test, y_pred, output_dict=True)
         report_df = pd.DataFrame(report).transpose()
         st.dataframe(report_df)
         st.markdown("**Insight**: Precision, recall, and F1-scores show the model's performance across Graduate, Dropout, and Enrolled classes.", unsafe_allow_html=True)
         col1, col2 = st.columns([1, 1])
         with col1:
-            st.markdown("<h3 style='font-size: 20px;'>Confusion Matrix</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='font-size: 16px;'>Confusion Matrix</h3>", unsafe_allow_html=True)
             cm = confusion_matrix(y_test, y_pred)
             fig, ax = plt.subplots(figsize=(8, 5))
             sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax,
@@ -679,7 +678,7 @@ def visualize_model_results(model, X_test, y_test):
             st.markdown("**Insight**: The matrix shows correct and incorrect predictions, with higher diagonal values indicating better performance.", unsafe_allow_html=True)
             plt.close()
         with col2:
-            st.markdown("<h3 style='font-size: 20px;'>Feature Importance</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='font-size: 16px;'>Feature Importance</h3>", unsafe_allow_html=True)
             feature_importance = pd.DataFrame({
                 'Feature': X_test.columns,
                 'Importance': model.feature_importances_
@@ -697,7 +696,7 @@ def visualize_model_results(model, X_test, y_test):
             plt.close()
 
 def main():
-    st.markdown("<div style='font-size: 28px; font-weight: bold;'>🎓 Student Dropout Prediction Dashboard</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size: 24px; font-weight: bold;'>🎓 Student Dropout Prediction Dashboard</div>", unsafe_allow_html=True)
     st.markdown("""
     This interactive dashboard helps predict and analyze factors contributing to student dropout. 
     Navigate through the sections below to explore data, analyze trends, train models, and predict outcomes.
@@ -706,10 +705,10 @@ def main():
         st.session_state.model_trained = False
     if 'show_prediction' not in st.session_state:
         st.session_state.show_prediction = False
-    st.sidebar.markdown("<div style='font-size: 28px; font-weight: bold;'>Navigation</div>", unsafe_allow_html=True)
+    st.sidebar.markdown("<div style='font-size: 20px; font-weight: bold;'>Navigation</div>", unsafe_allow_html=True)
     menu = ["Data Overview", "Exploratory Data Analysis", "Model Training & Evaluation", "Dropout Prediction"]
     choice = st.sidebar.radio("Select Module", menu, label_visibility="collapsed")
-    st.sidebar.markdown("<div style='font-size: 20px;'>Data Input</div>", unsafe_allow_html=True)
+    st.sidebar.markdown("<div style='font-size: 16px;'>Data Input</div>", unsafe_allow_html=True)
     uploaded_file = st.sidebar.file_uploader("Upload your Student Dropout CSV", type=['csv'])
     df = load_data(uploaded_file)
     X, y, processed_df = preprocess_data(df)
@@ -718,7 +717,7 @@ def main():
     if st.sidebar.button("Back to Top"):
         st.markdown("<script>window.scrollTo(0, 0);</script>", unsafe_allow_html=True)
     if choice == "Data Overview":
-        st.markdown("<div style='font-size: 28px; font-weight: bold;'>📊 Data Overview</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 20px; font-weight: bold;'>📊 Data Overview</div>", unsafe_allow_html=True)
         st.markdown("Explore the dataset structure and key statistics.")
         sub_menu = st.selectbox("Select Analysis", [
             "Data Quality Assessment",
@@ -760,7 +759,7 @@ def main():
             elif sub_menu == "Column Information":
                 display_column_info(df)
     elif choice == "Exploratory Data Analysis":
-        st.markdown("<div style='font-size: 28px; font-weight: bold;'>📈 Exploratory Data Analysis</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 20px; font-weight: bold;'>📈 Exploratory Data Analysis</div>", unsafe_allow_html=True)
         st.markdown("Analyze data distributions, correlations, and relationships with student outcomes.")
         sub_menu = st.selectbox("Select Analysis", [
             "Distribution Analysis",
@@ -830,7 +829,7 @@ def main():
                         st.markdown("**Insight**: Strong correlations indicate features that move together, influencing dropout prediction.", unsafe_allow_html=True)
                         plt.close()
                     with col2:
-                        st.markdown("<h3 style='font-size: 20px;'>Correlation Insights</h3>", unsafe_allow_html=True)
+                        st.markdown("<h3 style='font-size: 16px;'>Correlation Insights</h3>", unsafe_allow_html=True)
                         corr_pairs = []
                         for i in range(len(correlation_matrix.columns)):
                             for j in range(i + 1, len(correlation_matrix.columns)):
@@ -862,7 +861,7 @@ def main():
                     st.markdown("**Insight**: The proportion of Graduates, Dropouts, and Enrolled students shows the dataset's outcome balance.", unsafe_allow_html=True)
                     plt.close()
                 with col2:
-                    st.markdown("<h3 style='font-size: 20px;'>Outcome Statistics</h3>", unsafe_allow_html=True)
+                    st.markdown("<h3 style='font-size: 16px;'>Outcome Statistics</h3>", unsafe_allow_html=True)
                     total_students = len(df)
                     for outcome in df['Target'].unique():
                         count = (df['Target'] == outcome).sum()
@@ -904,7 +903,7 @@ def main():
                             .replace('Curricular units 1st sem (approved)', 'First Semester Units Passed') \
                             .replace('Curricular units 2nd sem (grade)', 'Second Semester Grades') \
                             .replace('Curricular units 2nd sem (approved)', 'Second Semester Units Passed')
-                        st.markdown(f"<h3 style='font-size: 20px;'>{friendly_name} Analysis</h3>", unsafe_allow_html=True)
+                        st.markdown(f"<h3 style='font-size: 16px;'>{friendly_name} Analysis</h3>", unsafe_allow_html=True)
                         col1, col2 = st.columns([2, 1])
                         with col1:
                             fig, ax = plt.subplots(figsize=(10, 5))
@@ -925,7 +924,7 @@ def main():
                             st.markdown(f"**Insight**: Higher {friendly_name.lower()} are associated with graduates, while lower values correlate with dropouts.", unsafe_allow_html=True)
                             plt.close()
                         with col2:
-                            st.markdown("<h3 style='font-size: 20px;'>Quick Summary</h3>", unsafe_allow_html=True)
+                            st.markdown("<h3 style='font-size: 16px;'>Quick Summary</h3>", unsafe_allow_html=True)
                             summary_stats = df.groupby('Target')[col].agg(['mean', 'count']).round(2)
                             for outcome in summary_stats.index:
                                 mean_val = summary_stats.loc[outcome, 'mean']
@@ -934,7 +933,7 @@ def main():
                                 st.write(f"{emoji} **{outcome}:** Average: {mean_val}, Students: {count_val}")
                             st.markdown(f"**Insight**: {friendly_name} significantly differentiates outcomes, guiding intervention strategies.", unsafe_allow_html=True)
     elif choice == "Model Training & Evaluation":
-        st.markdown("<div style='font-size: 28px; font-weight: bold;'>🤖 Model Training & Evaluation</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 20px; font-weight: bold;'>🤖 Model Training & Evaluation</div>", unsafe_allow_html=True)
         st.markdown("Train a machine learning model and evaluate its performance.")
         sub_menu = st.selectbox("Select Action", [
             "Train Model",
@@ -946,7 +945,7 @@ def main():
                     'Original': list(TARGET_MAPPING.keys()),
                     'Encoded': list(TARGET_MAPPING.values())
                 })
-                st.markdown("<h3 style='font-size: 20px;'>Target Label Encoding</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 style='font-size: 16px;'>Target Label Encoding</h3>", unsafe_allow_html=True)
                 st.dataframe(target_mapping_df)
                 st.write("Target values found:", processed_df['Target'].unique().tolist())
                 st.markdown("**Insight**: Encoded labels ensure the model can process categorical outcomes effectively.", unsafe_allow_html=True)
@@ -967,7 +966,7 @@ def main():
             else:
                 st.warning("Please train the model first!")
     elif choice == "Dropout Prediction" or st.session_state.show_prediction:
-        st.markdown("<div style='font-size: 28px; font-weight: bold;'>🔮 Dropout Prediction</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 20px; font-weight: bold;'>🔮 Dropout Prediction</div>", unsafe_allow_html=True)
         st.markdown("Predict the likelihood of dropout for an individual student.")
         if 'model' in st.session_state:
             with st.expander("Prediction Tool", expanded=True):
