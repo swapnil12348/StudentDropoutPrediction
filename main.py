@@ -322,30 +322,107 @@ def display_feature_explorer(df):
                 plt.close()
 
 def display_column_info(df):
-    """Display detailed column information"""
-    with st.expander("📋 Detailed Column Information"):
-        column_info = pd.DataFrame({
-            'Column Name': df.columns,
-            'Data Type': df.dtypes.astype(str),
-            'Non-Null Count': df.count(),
-            'Null Count': df.isnull().sum(),
-            'Null Percentage': (df.isnull().sum() / len(df) * 100).round(2),
-            'Unique Values': df.nunique()
+    """Display detailed column information using tabs instead of nested expanders"""
+
+    st.subheader("📋 Detailed Column Information")
+
+    # Create tabs for different sections
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 Overview", "📈 Statistics", "❌ Missing Data", "🔍 Data Types"])
+
+    with tab1:
+        st.write("**Dataset Overview**")
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.metric("Total Rows", len(df))
+        with col2:
+            st.metric("Total Columns", len(df.columns))
+        with col3:
+            st.metric("Memory Usage", f"{df.memory_usage().sum() / 1024 ** 2:.2f} MB")
+
+        st.write("**Column Names**")
+        st.write(", ".join(df.columns.tolist()))
+
+    with tab2:
+        st.write("**Statistical Summary**")
+
+        # Numeric columns statistics
+        numeric_cols = df.select_dtypes(include=['number']).columns
+        if len(numeric_cols) > 0:
+            st.write("*Numeric Columns:*")
+            st.dataframe(df[numeric_cols].describe())
+
+        # Categorical columns statistics
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        if len(categorical_cols) > 0:
+            st.write("*Categorical Columns:*")
+            cat_stats = []
+            for col in categorical_cols:
+                cat_stats.append({
+                    'Column': col,
+                    'Unique Values': df[col].nunique(),
+                    'Most Frequent': df[col].mode().iloc[0] if not df[col].mode().empty else 'N/A',
+                    'Frequency': df[col].value_counts().iloc[0] if len(df[col].value_counts()) > 0 else 0
+                })
+            st.dataframe(cat_stats)
+
+    with tab3:
+        st.write("**Missing Data Analysis**")
+
+        missing_data = df.isnull().sum()
+        missing_percentage = (missing_data / len(df)) * 100
+
+        missing_df = pd.DataFrame({
+            'Column': missing_data.index.tolist(),
+            'Missing Count': missing_data.values.tolist(),
+            'Missing Percentage': missing_percentage.values.tolist()
         })
-        def interpret_column(row):
-            if row['Null Percentage'] > 10:
-                return "⚠️ High missing data"
-            elif row['Unique Values'] == 1:
-                return "❌ No variation"
-            elif row['Unique Values'] == len(df):
-                return "🔑 Unique identifier"
-            elif row['Unique Values'] < 10:
-                return "📊 Categorical"
-            else:
-                return "📈 Continuous"
-        column_info['Interpretation'] = column_info.apply(interpret_column, axis=1)
-        st.dataframe(column_info)
-        st.markdown("**Insight**: Understanding column types and missing data helps prioritize features for modeling.", unsafe_allow_html=True)
+
+        # Only show columns with missing data
+        missing_df = missing_df[missing_df['Missing Count'] > 0]
+
+        if len(missing_df) > 0:
+            st.dataframe(missing_df)
+
+            # Visual representation
+            if len(missing_df) <= 10:  # Only show chart if not too many columns
+                import plotly.express as px
+                fig = px.bar(missing_df, x='Column', y='Missing Percentage',
+                             title='Missing Data Percentage by Column')
+                fig.update_xaxis(tickangle=45)
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.success("✅ No missing data found in the dataset!")
+
+    with tab4:
+        st.write("**Data Types Information**")
+
+        dtype_info = pd.DataFrame({
+            'Column': df.columns.tolist(),
+            'Data Type': [str(dtype) for dtype in df.dtypes],
+            'Non-Null Count': df.count().tolist(),
+            'Null Count': df.isnull().sum().tolist()
+        })
+
+        st.dataframe(dtype_info)
+
+        # Data type distribution
+        dtype_counts = df.dtypes.value_counts()
+        col1, col2 = st.columns([1, 1])
+
+        with col1:
+            st.write("**Data Type Distribution**")
+            for dtype, count in dtype_counts.items():
+                st.write(f"• {dtype}: {count} columns")
+
+        with col2:
+            if len(dtype_counts) > 1:
+                import plotly.express as px
+                # Convert to standard Python types to avoid JSON serialization error
+                fig = px.pie(values=dtype_counts.values.tolist(),
+                             names=[str(name) for name in dtype_counts.index],
+                             title='Distribution of Data Types')
+                st.plotly_chart(fig, use_container_width=True)
 
 def load_data(uploaded_file=None):
     """Load data from file or sample dataset"""
