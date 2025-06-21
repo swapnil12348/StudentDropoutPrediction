@@ -3,6 +3,13 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import shap
+import lime
+import lime.lime_tabular
+from sklearn.inspection import permutation_importance
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestClassifier
@@ -772,8 +779,554 @@ def visualize_model_results(model, X_test, y_test):
             st.markdown("**Insight**: Features like first-semester grades and units approved are critical drivers of the model's predictions.", unsafe_allow_html=True)
             plt.close()
 
+
+def display_global_feature_importance(model, feature_names):
+    """Display global feature importance using SHAP"""
+    st.markdown("#### 🌍 Global Feature Importance")
+    st.markdown("Understanding which features are most important across all predictions.")
+
+    try:
+        with st.spinner("Calculating global feature importance..."):
+            # Create SHAP explainer
+            explainer = shap.TreeExplainer(model)
+
+            # Get SHAP values for a sample of the training data
+            # Use a smaller sample for performance
+            sample_size = min(100, len(st.session_state.X_train))
+            X_sample = st.session_state.X_train.sample(n=sample_size, random_state=42)
+
+            shap_values = explainer.shap_values(X_sample)
+
+            # Handle different SHAP value formats
+            if isinstance(shap_values, list):
+                # Multi-class case: shap_values is a list of arrays
+                st.markdown("**Multi-class model detected**")
+
+                # Calculate mean absolute SHAP values for each class
+                class_importance = {}
+                for class_idx, class_shap_values in enumerate(shap_values):
+                    mean_abs_shap = np.mean(np.abs(class_shap_values), axis=0)
+                    class_importance[f'Class_{class_idx}'] = mean_abs_shap
+
+                # Overall importance (mean across all classes)
+                overall_importance = np.mean([np.abs(class_shap) for class_shap in shap_values], axis=(0, 1))
+
+                # Create DataFrame for overall importance
+                importance_df = pd.DataFrame({
+                    'Feature': feature_names,
+                    'Mean_Abs_SHAP': overall_importance
+                }).sort_values('Mean_Abs_SHAP', ascending=False)
+
+                # Display overall importance
+                st.markdown("**🏆 Overall Feature Importance (All Classes)**")
+                col1, col2 = st.columns([2, 1])
+
+                with col1:
+                    fig = px.bar(
+                        importance_df.head(15),
+                        x='Mean_Abs_SHAP',
+                        y='Feature',
+                        orientation='h',
+                        title='Top 15 Most Important Features (Overall)',
+                        color='Mean_Abs_SHAP',
+                        color_continuous_scale='viridis'
+                    )
+                    fig.update_layout(yaxis={'categoryorder': 'total ascending'})
+                    st.plotly_chart(fig, use_container_width=True)
+
+                with col2:
+                    st.markdown("**📊 Top 10 Features:**")
+                    for i, (idx, row) in enumerate(importance_df.head(10).iterrows()):
+                        st.write(f"{i + 1}. **{row['Feature']}**: {row['Mean_Abs_SHAP']:.4f}")
+
+                # Class-specific importance
+                st.markdown("**🎯 Class-Specific Feature Importance**")
+
+                class_tabs = st.tabs([f"Class {i}" for i in range(len(shap_values))])
+
+                for class_idx, tab in enumerate(class_tabs):
+                    with tab:
+                        class_df = pd.DataFrame({
+                            'Feature': feature_names,
+                            'Mean_Abs_SHAP': class_importance[f'Class_{class_idx}']
+                        }).sort_values('Mean_Abs_SHAP', ascending=False)
+
+                        # Readable class names
+                        class_name = "Dropout" if class_idx == 0 else "Graduate" if class_idx == 1 else "Enrolled"
+                        st.markdown(f"**Most Important Features for {class_name} Prediction:**")
+
+                        fig = px.bar(
+                            class_df.head(10),
+                            x='Mean_Abs_SHAP',
+                            y='Feature',
+                            orientation='h',
+                            title=f'Top 10 Features for {class_name}',
+                            color='Mean_Abs_SHAP',
+                            color_continuous_scale='plasma'
+                        )
+                        fig.update_layout(yaxis={'categoryorder': 'total ascending'})
+                        st.plotly_chart(fig, use_container_width=True)
+
+            else:
+                # Binary classification case
+                st.markdown("**Binary classification model detected**")
+
+                # Calculate mean absolute SHAP values
+                mean_abs_shap = np.mean(np.abs(shap_values), axis=0)
+
+                # Create DataFrame
+                importance_df = pd.DataFrame({
+                    'Feature': feature_names,
+                    'Mean_Abs_SHAP': mean_abs_shap
+                }).sort_values('Mean_Abs_SHAP', ascending=False)
+
+                # Display results
+                col1, col2 = st.columns([2, 1])
+
+                with col1:
+                    fig = px.bar(
+                        importance_df.head(15),
+                        x='Mean_Abs_SHAP',
+                        y='Feature',
+                        orientation='h',
+                        title='Top 15 Most Important Features',
+                        color='Mean_Abs_SHAP',
+                        color_continuous_scale='viridis'
+                    )
+                    fig.update_layout(yaxis={'categoryorder': 'total ascending'})
+                    st.plotly_chart(fig, use_container_width=True)
+
+                with col2:
+                    st.markdown("**📊 Top 10 Features:**")
+                    for i, (idx, row) in enumerate(importance_df.head(10).iterrows()):
+                        st.write(f"{i + 1}. **{row['Feature']}**: {row['Mean_Abs_SHAP']:.4f}")
+
+            # SHAP Summary Plot
+            st.markdown("**📈 SHAP Summary Plot**")
+
+            if isinstance(shap_values, list):
+                # For multi-class, show summary for the first class (usually most interesting)
+                fig_summary = plt.figure(figsize=(10, 8))
+                shap.summary_plot(shap_values[0], X_sample, feature_names=feature_names, show=False)
+                st.pyplot(fig_summary)
+                plt.close()
+                st.caption(
+                    "Summary plot for Class 0 (Dropout). Each dot represents a student, color indicates feature value.")
+            else:
+                fig_summary = plt.figure(figsize=(10, 8))
+                shap.summary_plot(shap_values, X_sample, feature_names=feature_names, show=False)
+                st.pyplot(fig_summary)
+                plt.close()
+                st.caption("Each dot represents a student, color indicates feature value.")
+
+            # Insights
+            st.markdown("### 💡 Key Insights")
+            top_3_features = importance_df.head(3)['Feature'].tolist()
+            st.write(f"**Top 3 most important features:** {', '.join(top_3_features)}")
+            st.write("• Higher SHAP values indicate greater impact on model predictions")
+            st.write("• Focus intervention strategies on the most important features")
+            st.write("• Consider collecting more data for less important features that might be noise")
+
+    except Exception as e:
+        st.error(f"Error calculating feature importance: {str(e)}")
+        st.info("This might be due to model compatibility issues. Try retraining the model or check your data format.")
+
+        # Fallback: Show model feature importance if available
+        try:
+            if hasattr(model, 'feature_importances_'):
+                st.markdown("**🔄 Fallback: Model Built-in Feature Importance**")
+                fallback_df = pd.DataFrame({
+                    'Feature': feature_names,
+                    'Importance': model.feature_importances_
+                }).sort_values('Importance', ascending=False)
+
+                fig = px.bar(
+                    fallback_df.head(15),
+                    x='Importance',
+                    y='Feature',
+                    orientation='h',
+                    title='Top 15 Features (Model Built-in Importance)'
+                )
+                fig.update_layout(yaxis={'categoryorder': 'total ascending'})
+                st.plotly_chart(fig, use_container_width=True)
+        except:
+            st.write("Could not display alternative feature importance.")
+
+def display_local_explanation(model, X_train, X_test, feature_names):
+    """Display local explanations for individual predictions"""
+    st.markdown("#### 🔍 Local Prediction Explanation")
+    st.markdown("Understand why the model made a specific prediction for an individual student.")
+
+    # Student selection
+    st.markdown("**Select a student to explain:**")
+    student_idx = st.selectbox(
+        "Choose student index from test set",
+        range(len(X_test)),
+        format_func=lambda x: f"Student {x + 1}"
+    )
+
+    # Get the selected student data
+    student_data = X_test.iloc[student_idx:student_idx + 1]
+    prediction = model.predict(student_data)[0]
+    prediction_proba = model.predict_proba(student_data)[0]
+
+    # Display prediction
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Predicted Outcome", f"Class {prediction}")
+    with col2:
+        max_proba = np.max(prediction_proba)
+        st.metric("Confidence", f"{max_proba:.2%}")
+    with col3:
+        # Map prediction to readable format if you have TARGET_MAPPING
+        readable_prediction = "Dropout" if prediction == 0 else "Graduate" if prediction == 1 else "Enrolled"
+        st.metric("Prediction", readable_prediction)
+
+    # Show all class probabilities
+    st.markdown("**📊 Prediction Probabilities:**")
+    prob_df = pd.DataFrame({
+        'Class': [f'Class {i}' for i in range(len(prediction_proba))],
+        'Probability': prediction_proba
+    })
+    fig = px.bar(prob_df, x='Class', y='Probability',
+                 title="Prediction Probabilities for Selected Student")
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Explanation method selection
+    explanation_method = st.selectbox(
+        "Select Explanation Method",
+        ["SHAP Local Explanation", "LIME Explanation"]
+    )
+
+    try:
+        if explanation_method == "SHAP Local Explanation":
+            with st.spinner("Generating SHAP explanation..."):
+                # Create SHAP explainer
+                explainer = shap.TreeExplainer(model)
+                shap_values = explainer.shap_values(student_data)
+
+                # Handle multi-class output
+                if isinstance(shap_values, list):
+                    shap_values_for_prediction = shap_values[prediction]  # Use predicted class
+                else:
+                    shap_values_for_prediction = shap_values
+
+                # SHAP waterfall plot - FIXED VERSION
+                st.markdown("**🌊 SHAP Waterfall Plot**")
+
+                # Create the explanation object properly
+                if isinstance(explainer.expected_value, np.ndarray):
+                    base_value = explainer.expected_value[prediction]
+                else:
+                    base_value = explainer.expected_value
+
+                shap_explanation = shap.Explanation(
+                    values=shap_values_for_prediction[0],  # Single instance SHAP values
+                    base_values=base_value,
+                    data=student_data.iloc[0].values,
+                    feature_names=feature_names
+                )
+
+                # Use the newer shap.plots.waterfall function
+                fig_waterfall = plt.figure(figsize=(10, 8))
+                shap.plots.waterfall(shap_explanation, show=False)
+                st.pyplot(fig_waterfall)
+                plt.close()
+
+                # Top contributing features
+                shap_importance = pd.DataFrame({
+                    'Feature': feature_names,
+                    'SHAP_Value': shap_values_for_prediction[0],
+                    'Feature_Value': student_data.iloc[0].values
+                })
+                shap_importance['Abs_SHAP'] = np.abs(shap_importance['SHAP_Value'])
+                shap_importance = shap_importance.sort_values('Abs_SHAP', ascending=False)
+
+                st.markdown("**🎯 Top Contributing Features:**")
+                for i, (idx, row) in enumerate(shap_importance.head(5).iterrows()):
+                    impact = "increases" if row['SHAP_Value'] > 0 else "decreases"
+                    st.write(
+                        f"{i + 1}. **{row['Feature']}** (value: {row['Feature_Value']:.2f}) {impact} prediction by {abs(row['SHAP_Value']):.4f}")
+
+        elif explanation_method == "LIME Explanation":
+            with st.spinner("Generating LIME explanation..."):
+                # Create LIME explainer
+                explainer = lime.lime_tabular.LimeTabularExplainer(
+                    X_train.values,
+                    feature_names=feature_names,
+                    class_names=[f'Class_{i}' for i in range(len(prediction_proba))],
+                    mode='classification'
+                )
+
+                # Generate explanation
+                explanation = explainer.explain_instance(
+                    student_data.iloc[0].values,
+                    model.predict_proba,
+                    num_features=10
+                )
+
+                # Display LIME plot
+                st.markdown("**🍃 LIME Explanation**")
+                fig_lime = explanation.as_pyplot_figure()
+                st.pyplot(fig_lime)
+                plt.close()
+
+                # Extract and display feature contributions
+                lime_values = explanation.as_list()
+                st.markdown("**📋 LIME Feature Contributions:**")
+                for i, (feature_desc, contribution) in enumerate(lime_values[:5]):
+                    impact = "supports" if contribution > 0 else "opposes"
+                    st.write(f"{i + 1}. {feature_desc} {impact} the prediction (weight: {contribution:.4f})")
+
+    except Exception as e:
+        st.error(f"Error generating explanation: {str(e)}")
+        st.info("Try selecting a different student or explanation method.")
+
+def display_feature_impact_analysis(model, X_train, X_test, feature_names, df):
+    """Display how different feature values impact predictions"""
+    st.markdown("#### 📈 Feature Impact Analysis")
+    st.markdown("Explore how changing feature values affects prediction probabilities.")
+
+    # Feature selection for analysis
+    selected_feature = st.selectbox(
+        "Select feature to analyze",
+        feature_names
+    )
+
+    if selected_feature:
+        # Get feature statistics
+        feature_stats = df[selected_feature].describe()
+
+        col1, col2 = st.columns([2, 1])
+
+        with col1:
+            # Create range of values for the selected feature
+            feature_min = feature_stats['min']
+            feature_max = feature_stats['max']
+            feature_mean = feature_stats['mean']
+
+            # Generate range of values
+            if feature_max - feature_min > 0:
+                feature_range = np.linspace(feature_min, feature_max, 50)
+            else:
+                feature_range = [feature_mean]
+
+            # Use a representative sample from test set
+            sample_student = X_test.iloc[0:1].copy()
+
+            # Calculate predictions for different feature values
+            predictions_over_range = []
+            for value in feature_range:
+                temp_student = sample_student.copy()
+                temp_student[selected_feature] = value
+                pred_proba = model.predict_proba(temp_student)[0]
+                predictions_over_range.append(pred_proba)
+
+            # Convert to DataFrame for plotting
+            pred_df = pd.DataFrame(predictions_over_range)
+            pred_df['Feature_Value'] = feature_range
+
+            # Melt for plotting
+            pred_melted = pred_df.melt(id_vars=['Feature_Value'],
+                                       value_vars=list(range(len(pred_df.columns) - 1)),
+                                       var_name='Class', value_name='Probability')
+            pred_melted['Class'] = pred_melted['Class'].apply(lambda x: f'Class_{x}')
+
+            # Plot feature impact
+            fig = px.line(pred_melted, x='Feature_Value', y='Probability',
+                          color='Class', title=f'Impact of {selected_feature} on Predictions')
+            fig.add_vline(x=feature_mean, line_dash="dash",
+                          annotation_text=f"Mean: {feature_mean:.2f}")
+            fig.update_layout(
+                xaxis_title=selected_feature,
+                yaxis_title='Prediction Probability'
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+            st.markdown(
+                f"**Insight**: This shows how changing {selected_feature} from {feature_min:.2f} to {feature_max:.2f} affects the model's predictions.")
+
+        with col2:
+            st.markdown("**📊 Feature Statistics**")
+            st.write(f"**Min**: {feature_stats['min']:.2f}")
+            st.write(f"**Max**: {feature_stats['max']:.2f}")
+            st.write(f"**Mean**: {feature_stats['mean']:.2f}")
+            st.write(f"**Std**: {feature_stats['std']:.2f}")
+
+            # Feature value distribution
+            st.markdown("**📈 Value Distribution**")
+            fig_hist = px.histogram(df, x=selected_feature, nbins=30)
+            st.plotly_chart(fig_hist, use_container_width=True)
+
+            # Risk zones
+            st.markdown("**⚠️ Risk Analysis**")
+            if len(feature_range) > 1:
+                high_risk_threshold = np.percentile(feature_range, 75)
+                low_risk_threshold = np.percentile(feature_range, 25)
+                st.write(f"**High Risk Zone**: > {high_risk_threshold:.2f}")
+                st.write(f"**Medium Risk Zone**: {low_risk_threshold:.2f} - {high_risk_threshold:.2f}")
+                st.write(f"**Low Risk Zone**: < {low_risk_threshold:.2f}")
+
+
+def individual_dropout_prediction_with_explanation(model, X, X_train, feature_names):
+    """Enhanced individual prediction with explanations"""
+    st.markdown("#### 🎯 Individual Student Prediction with Explanation")
+
+    # Create input form for student data
+    st.markdown("**Enter Student Information:**")
+
+    # Create columns for better layout
+    col1, col2 = st.columns(2)
+
+    input_data = {}
+    feature_list = feature_names.tolist()
+
+    # Split features into two columns
+    mid_point = len(feature_list) // 2
+
+    with col1:
+        for feature in feature_list[:mid_point]:
+            if feature in X.columns:
+                min_val = float(X[feature].min())
+                max_val = float(X[feature].max())
+                mean_val = float(X[feature].mean())
+
+                input_data[feature] = st.number_input(
+                    f"{feature}",
+                    min_value=min_val,
+                    max_value=max_val,
+                    value=mean_val,
+                    key=f"input_{feature}"
+                )
+
+    with col2:
+        for feature in feature_list[mid_point:]:
+            if feature in X.columns:
+                min_val = float(X[feature].min())
+                max_val = float(X[feature].max())
+                mean_val = float(X[feature].mean())
+
+                input_data[feature] = st.number_input(
+                    f"{feature}",
+                    min_value=min_val,
+                    max_value=max_val,
+                    value=mean_val,
+                    key=f"input_{feature}"
+                )
+
+    if st.button("🔮 Predict with Explanation", type="primary"):
+        # Create DataFrame from input
+        input_df = pd.DataFrame([input_data])
+
+        # Make prediction
+        prediction = model.predict(input_df)[0]
+        prediction_proba = model.predict_proba(input_df)[0]
+
+        # Display results
+        st.markdown("---")
+        st.markdown("### 📊 Prediction Results")
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            readable_prediction = "Dropout" if prediction == 0 else "Graduate" if prediction == 1 else "Enrolled"
+            st.metric("🎯 Prediction", readable_prediction)
+
+        with col2:
+            confidence = np.max(prediction_proba)
+            st.metric("🎯 Confidence", f"{confidence:.1%}")
+
+        with col3:
+            risk_level = "High" if prediction == 0 else "Low"
+            st.metric("⚠️ Risk Level", risk_level)
+
+        # Probability breakdown
+        st.markdown("**📊 Detailed Probabilities:**")
+        prob_data = {
+            'Outcome': ['Dropout', 'Graduate', 'Enrolled'][:len(prediction_proba)],
+            'Probability': prediction_proba
+        }
+        prob_df = pd.DataFrame(prob_data)
+
+        fig = px.bar(prob_df, x='Outcome', y='Probability',
+                     color='Probability', color_continuous_scale='RdYlGn_r',
+                     title="Prediction Probabilities")
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Generate explanation
+        try:
+            st.markdown("### 🔍 Why This Prediction?")
+
+            with st.spinner("Generating explanation..."):
+                # SHAP explanation
+                explainer = shap.TreeExplainer(model)
+                shap_values = explainer.shap_values(input_df)
+
+                if isinstance(shap_values, list):
+                    shap_values_single = shap_values[prediction]
+                else:
+                    shap_values_single = shap_values
+
+                # Feature contributions
+                feature_contrib = pd.DataFrame({
+                    'Feature': feature_names,
+                    'Value': input_df.iloc[0].values,
+                    'SHAP_Value': shap_values_single[0]
+                })
+                feature_contrib['Abs_SHAP'] = np.abs(feature_contrib['SHAP_Value'])
+                feature_contrib = feature_contrib.sort_values('Abs_SHAP', ascending=False)
+
+                # Display top contributing features
+                st.markdown("**🎯 Top Factors Influencing This Prediction:**")
+
+                for i, (idx, row) in enumerate(feature_contrib.head(5).iterrows()):
+                    impact = "increases" if row['SHAP_Value'] > 0 else "decreases"
+                    color = "🔴" if row['SHAP_Value'] > 0 else "🟢"
+
+                    st.write(f"{i + 1}. {color} **{row['Feature']}** (value: {row['Value']:.2f}) "
+                             f"{impact} dropout risk by {abs(row['SHAP_Value']):.4f}")
+
+                # Visualization of feature contributions
+                top_features = feature_contrib.head(10)
+                fig = px.bar(top_features, x='SHAP_Value', y='Feature',
+                             orientation='h', color='SHAP_Value',
+                             color_continuous_scale='RdBu_r',
+                             title="Feature Contributions to Prediction")
+                fig.update_layout(yaxis={'categoryorder': 'total ascending'})
+                st.plotly_chart(fig, use_container_width=True)
+
+                # Recommendations
+                st.markdown("### 💡 Recommendations")
+                if prediction == 0:  # Dropout prediction
+                    st.warning("**High Dropout Risk Detected!**")
+                    st.markdown("**Recommended Interventions:**")
+
+                    # Find features that increase dropout risk
+                    risk_factors = feature_contrib[feature_contrib['SHAP_Value'] > 0].head(3)
+                    for idx, row in risk_factors.iterrows():
+                        st.write(f"• Address **{row['Feature']}** - current value: {row['Value']:.2f}")
+
+                    st.markdown("**Support Strategies:**")
+                    st.write("• Academic counseling and tutoring")
+                    st.write("• Financial aid consultation")
+                    st.write("• Student engagement programs")
+                    st.write("• Regular progress monitoring")
+
+                else:  # Graduate/Enrolled prediction
+                    st.success("**Low Dropout Risk - Student on Track!**")
+                    st.markdown("**Maintain Success Factors:**")
+
+                    protective_factors = feature_contrib[feature_contrib['SHAP_Value'] < 0].head(3)
+                    for idx, row in protective_factors.iterrows():
+                        st.write(f"• Continue supporting **{row['Feature']}** - current value: {row['Value']:.2f}")
+
+        except Exception as e:
+            st.error(f"Could not generate explanation: {str(e)}")
+            st.info("Prediction completed, but explanation feature is unavailable.")
+
+
 def main():
-    st.markdown("<div style='font-size: 24px; font-weight: bold;'>🎓 Student Dropout Prediction Dashboard</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size: 24px; font-weight: bold;'>🎓 Student Dropout Prediction Dashboard</div>",
+                unsafe_allow_html=True)
     st.markdown("""
     This interactive dashboard helps predict and analyze factors contributing to student dropout. 
     Navigate through the sections below to explore data, analyze trends, train models, and predict outcomes.
@@ -782,20 +1335,25 @@ def main():
         st.session_state.model_trained = False
     if 'show_prediction' not in st.session_state:
         st.session_state.show_prediction = False
+
     st.sidebar.markdown("<div style='font-size: 20px; font-weight: bold;'>Navigation</div>", unsafe_allow_html=True)
     menu = ["Data Overview", "Exploratory Data Analysis", "Model Training & Evaluation", "Dropout Prediction"]
     choice = st.sidebar.radio("Select Module", menu, label_visibility="collapsed")
+
     st.sidebar.markdown("<div style='font-size: 16px;'>Data Input</div>", unsafe_allow_html=True)
     uploaded_file = st.sidebar.file_uploader("Upload your Student Dropout CSV", type=['csv'])
     df = load_data(uploaded_file)
     X, y, processed_df = preprocess_data(df)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
     st.sidebar.markdown("---")
     if st.sidebar.button("Back to Top"):
         st.markdown("<script>window.scrollTo(0, 0);</script>", unsafe_allow_html=True)
+
     if choice == "Data Overview":
         st.markdown("<div style='font-size: 20px; font-weight: bold;'>📊 Data Overview</div>", unsafe_allow_html=True)
         st.markdown("Explore the dataset structure and key statistics.")
+
         sub_menu = st.selectbox("Select Analysis", [
             "Data Quality Assessment",
             "Demographics Insights",
@@ -806,6 +1364,7 @@ def main():
             "Feature Explorer",
             "Column Information"
         ], key="data_overview_submenu")
+
         with st.expander(f"{sub_menu}", expanded=True):
             if sub_menu == "Data Quality Assessment":
                 col1, col2, col3, col4 = st.columns(4)
@@ -835,15 +1394,19 @@ def main():
                 display_feature_explorer(df)
             elif sub_menu == "Column Information":
                 display_column_info(df)
+
     elif choice == "Exploratory Data Analysis":
-        st.markdown("<div style='font-size: 20px; font-weight: bold;'>📈 Exploratory Data Analysis</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 20px; font-weight: bold;'>📈 Exploratory Data Analysis</div>",
+                    unsafe_allow_html=True)
         st.markdown("Analyze data distributions, correlations, and relationships with student outcomes.")
+
         sub_menu = st.selectbox("Select Analysis", [
             "Distribution Analysis",
             "Correlation Analysis",
             "Outcome Analysis",
             "Academic Performance"
         ], key="eda_submenu")
+
         df_viz = df.copy()
         label_mappings = {
             'Gender': {0: 'Female', 1: 'Male'},
@@ -855,19 +1418,23 @@ def main():
             'Educational special needs': {0: 'No Special Needs', 1: 'Has Special Needs'},
             'Daytime/evening attendance': {0: 'Evening', 1: 'Daytime'}
         }
+
         for col, mapping in label_mappings.items():
             if col in df_viz.columns:
                 df_viz[col] = df_viz[col].map(mapping).fillna(df_viz[col])
+
         with st.expander(f"{sub_menu}", expanded=True):
             if sub_menu == "Distribution Analysis":
                 numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
                 numeric_cols = [col for col in numeric_cols if col not in ['Target', 'id']]
+
                 selected_columns = st.multiselect(
                     "Select features to visualize (up to 4)",
                     options=numeric_cols,
                     default=['Age at enrollment', 'Admission grade', 'Curricular units 1st sem (grade)'][:3],
                     max_selections=4
                 )
+
                 if selected_columns:
                     cols = st.columns(min(len(selected_columns), 2))
                     for i, column in enumerate(selected_columns):
@@ -880,31 +1447,38 @@ def main():
                             ax.tick_params(axis='both', labelsize=10)
                             plt.tight_layout()
                             st.pyplot(fig)
-                            st.markdown(f"**Insight**: The distribution of {column} shows its range and central tendency, impacting dropout risk.", unsafe_allow_html=True)
+                            st.markdown(
+                                f"**Insight**: The distribution of {column} shows its range and central tendency, impacting dropout risk.",
+                                unsafe_allow_html=True)
                             plt.close()
                 else:
                     st.info("Select at least one column to visualize.")
+
             elif sub_menu == "Correlation Analysis":
                 numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
                 correlation_features = st.multiselect(
                     "Select features for correlation analysis",
                     options=numeric_cols,
                     default=['Age at enrollment', 'Admission grade', 'Curricular units 1st sem (grade)',
-                            'Curricular units 2nd sem (grade)'][:4]
+                             'Curricular units 2nd sem (grade)'][:4]
                 )
+
                 if len(correlation_features) > 1:
                     col1, col2 = st.columns([2, 1])
                     with col1:
                         correlation_matrix = df[correlation_features].corr()
                         fig, ax = plt.subplots(figsize=(8, 6))
                         sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', ax=ax, center=0, fmt='.2f',
-                                   annot_kws={'size': 10})
+                                    annot_kws={'size': 10})
                         ax.set_title('Correlation Matrix of Selected Features', fontsize=14, fontweight='bold', pad=15)
                         ax.tick_params(axis='both', labelsize=10)
                         plt.tight_layout()
                         st.pyplot(fig)
-                        st.markdown("**Insight**: Strong correlations indicate features that move together, influencing dropout prediction.", unsafe_allow_html=True)
+                        st.markdown(
+                            "**Insight**: Strong correlations indicate features that move together, influencing dropout prediction.",
+                            unsafe_allow_html=True)
                         plt.close()
+
                     with col2:
                         st.markdown("<h3 style='font-size: 16px;'>Correlation Insights</h3>", unsafe_allow_html=True)
                         corr_pairs = []
@@ -914,29 +1488,38 @@ def main():
                                 if abs(corr_value) > 0.5:
                                     corr_pairs.append(
                                         (correlation_matrix.columns[i], correlation_matrix.columns[j], corr_value))
+
                         if corr_pairs:
                             corr_pairs.sort(key=lambda x: abs(x[2]), reverse=True)
                             for feat1, feat2, corr in corr_pairs[:5]:
                                 direction = "positive" if corr > 0 else "negative"
                                 st.write(f"• **{feat1}** & **{feat2}**: {direction} ({corr:.2f})")
-                            st.markdown("**Insight**: High correlations highlight key feature relationships affecting student outcomes.", unsafe_allow_html=True)
+                            st.markdown(
+                                "**Insight**: High correlations highlight key feature relationships affecting student outcomes.",
+                                unsafe_allow_html=True)
                         else:
                             st.write("No strong correlations (>0.5) found.")
-                            st.markdown("**Insight**: Weak correlations suggest features are independent, requiring diverse predictors.", unsafe_allow_html=True)
+                            st.markdown(
+                                "**Insight**: Weak correlations suggest features are independent, requiring diverse predictors.",
+                                unsafe_allow_html=True)
                 else:
                     st.info("Select at least two features for correlation analysis.")
+
             elif sub_menu == "Outcome Analysis":
                 col1, col2 = st.columns([1, 1])
                 with col1:
                     fig, ax = plt.subplots(figsize=(8, 5))
                     target_counts = df['Target'].value_counts()
                     ax.pie(target_counts.values, labels=target_counts.index, autopct='%1.1f%%',
-                          colors=['#ff9999', '#66b3ff', '#99ff99'], textprops={'fontsize': 10})
+                           colors=['#ff9999', '#66b3ff', '#99ff99'], textprops={'fontsize': 10})
                     ax.set_title('Distribution of Student Outcomes', fontsize=14, fontweight='bold', pad=15)
                     plt.tight_layout()
                     st.pyplot(fig)
-                    st.markdown("**Insight**: The proportion of Graduates, Dropouts, and Enrolled students shows the dataset's outcome balance.", unsafe_allow_html=True)
+                    st.markdown(
+                        "**Insight**: The proportion of Graduates, Dropouts, and Enrolled students shows the dataset's outcome balance.",
+                        unsafe_allow_html=True)
                     plt.close()
+
                 with col2:
                     st.markdown("<h3 style='font-size: 16px;'>Outcome Statistics</h3>", unsafe_allow_html=True)
                     total_students = len(df)
@@ -944,12 +1527,16 @@ def main():
                         count = (df['Target'] == outcome).sum()
                         percentage = count / total_students * 100
                         st.write(f"• **{outcome}**: {count:,} students ({percentage:.1f}%)")
-                    st.markdown("**Insight**: Dropout rates indicate the scale of the challenge in improving student retention.", unsafe_allow_html=True)
+                    st.markdown(
+                        "**Insight**: Dropout rates indicate the scale of the challenge in improving student retention.",
+                        unsafe_allow_html=True)
+
                 factor_cols = st.multiselect(
                     "Select factors to analyze against outcomes",
                     options=['Gender', 'Scholarship holder', 'Displaced', 'International'],
                     default=['Gender', 'Scholarship holder']
                 )
+
                 if factor_cols:
                     cols = st.columns(min(len(factor_cols), 2))
                     for i, col in enumerate(factor_cols):
@@ -965,8 +1552,11 @@ def main():
                             ax.legend(title='Outcome', fontsize=10)
                             plt.tight_layout()
                             st.pyplot(fig)
-                            st.markdown(f"**Insight**: {col} influences student outcomes, with certain categories linked to higher dropout rates.", unsafe_allow_html=True)
+                            st.markdown(
+                                f"**Insight**: {col} influences student outcomes, with certain categories linked to higher dropout rates.",
+                                unsafe_allow_html=True)
                             plt.close()
+
             elif sub_menu == "Academic Performance":
                 academic_cols = [col for col in df.columns if 'grade' in col.lower() or 'approved' in col.lower()]
                 selected_academic = st.multiselect(
@@ -974,14 +1564,18 @@ def main():
                     options=academic_cols,
                     default=['Curricular units 1st sem (grade)', 'Curricular units 1st sem (approved)'][:2]
                 )
+
                 if selected_academic:
                     for col in selected_academic:
                         friendly_name = col.replace('Curricular units 1st sem (grade)', 'First Semester Grades') \
                             .replace('Curricular units 1st sem (approved)', 'First Semester Units Passed') \
                             .replace('Curricular units 2nd sem (grade)', 'Second Semester Grades') \
                             .replace('Curricular units 2nd sem (approved)', 'Second Semester Units Passed')
-                        st.markdown(f"<h3 style='font-size: 16px;'>{friendly_name} Analysis</h3>", unsafe_allow_html=True)
+
+                        st.markdown(f"<h3 style='font-size: 16px;'>{friendly_name} Analysis</h3>",
+                                    unsafe_allow_html=True)
                         col1, col2 = st.columns([2, 1])
+
                         with col1:
                             fig, ax = plt.subplots(figsize=(10, 5))
                             colors = ['lightcoral', 'lightgreen', 'lightskyblue']
@@ -989,17 +1583,22 @@ def main():
                                 [df[df['Target'] == outcome][col].dropna() for outcome in df['Target'].unique()],
                                 labels=df['Target'].unique(),
                                 patch_artist=True)
+
                             for patch, color in zip(box_plot['boxes'], colors):
                                 patch.set_facecolor(color)
                                 patch.set_alpha(0.7)
+
                             ax.set_title(f'{friendly_name} by Student Outcome', fontsize=14, fontweight='bold', pad=15)
                             ax.set_xlabel('Student Outcome', fontsize=12)
                             ax.set_ylabel(friendly_name, fontsize=12)
                             ax.tick_params(axis='both', labelsize=10)
                             plt.tight_layout()
                             st.pyplot(fig)
-                            st.markdown(f"**Insight**: Higher {friendly_name.lower()} are associated with graduates, while lower values correlate with dropouts.", unsafe_allow_html=True)
+                            st.markdown(
+                                f"**Insight**: Higher {friendly_name.lower()} are associated with graduates, while lower values correlate with dropouts.",
+                                unsafe_allow_html=True)
                             plt.close()
+
                         with col2:
                             st.markdown("<h3 style='font-size: 16px;'>Quick Summary</h3>", unsafe_allow_html=True)
                             summary_stats = df.groupby('Target')[col].agg(['mean', 'count']).round(2)
@@ -1008,14 +1607,21 @@ def main():
                                 count_val = int(summary_stats.loc[outcome, 'count'])
                                 emoji = "🎓" if outcome == 'Graduate' else "⚠️" if outcome == 'Dropout' else "📚"
                                 st.write(f"{emoji} **{outcome}:** Average: {mean_val}, Students: {count_val}")
-                            st.markdown(f"**Insight**: {friendly_name} significantly differentiates outcomes, guiding intervention strategies.", unsafe_allow_html=True)
+                            st.markdown(
+                                f"**Insight**: {friendly_name} significantly differentiates outcomes, guiding intervention strategies.",
+                                unsafe_allow_html=True)
+
     elif choice == "Model Training & Evaluation":
-        st.markdown("<div style='font-size: 20px; font-weight: bold;'>🤖 Model Training & Evaluation</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 20px; font-weight: bold;'>🤖 Model Training & Evaluation</div>",
+                    unsafe_allow_html=True)
         st.markdown("Train a machine learning model and evaluate its performance.")
+
         sub_menu = st.selectbox("Select Action", [
             "Train Model",
-            "View Results"
+            "View Results",
+            "Model Explainability"  # NEW: Added explainability option
         ], key="model_submenu")
+
         if sub_menu == "Train Model":
             with st.expander("Model Training", expanded=True):
                 target_mapping_df = pd.DataFrame({
@@ -1025,15 +1631,24 @@ def main():
                 st.markdown("<h3 style='font-size: 16px;'>Target Label Encoding</h3>", unsafe_allow_html=True)
                 st.dataframe(target_mapping_df)
                 st.write("Target values found:", processed_df['Target'].unique().tolist())
-                st.markdown("**Insight**: Encoded labels ensure the model can process categorical outcomes effectively.", unsafe_allow_html=True)
+                st.markdown(
+                    "**Insight**: Encoded labels ensure the model can process categorical outcomes effectively.",
+                    unsafe_allow_html=True)
+
                 if st.button("Start Training"):
                     with st.spinner("Training model..."):
                         model = train_model(X_train, y_train)
                         st.session_state.model = model
                         st.session_state.model_trained = True
+                        # Store training data for explainability
+                        st.session_state.X_train = X_train
+                        st.session_state.X_test = X_test
+                        st.session_state.y_test = y_test
+                        st.session_state.feature_names = X.columns.tolist()
                         st.success("Model trained successfully!")
                         st.button("View Results", key="go_to_results")
-        else:
+
+        elif sub_menu == "View Results":
             if st.session_state.model_trained:
                 with st.expander("Model Results", expanded=True):
                     visualize_model_results(st.session_state.model, X_test, y_test)
@@ -1042,17 +1657,66 @@ def main():
                         st.experimental_rerun()
             else:
                 st.warning("Please train the model first!")
+
+        # NEW: Model Explainability Section
+        elif sub_menu == "Model Explainability":
+            if st.session_state.model_trained and 'model' in st.session_state:
+                with st.expander("Model Explainability Dashboard", expanded=True):
+                    st.markdown("### 🔍 Understanding Model Decisions")
+                    st.markdown("Explore how the model makes predictions and which features are most important.")
+
+                    explainability_type = st.selectbox(
+                        "Select Explainability Analysis",
+                        ["Global Feature Importance", "Local Prediction Explanation", "Feature Impact Analysis"]
+                    )
+
+                    if explainability_type == "Global Feature Importance":
+                        display_global_feature_importance(
+                            st.session_state.model,
+                            st.session_state.feature_names
+                        )
+
+                    elif explainability_type == "Local Prediction Explanation":
+                        display_local_explanation(
+                            st.session_state.model,
+                            st.session_state.X_train,
+                            st.session_state.X_test,
+                            st.session_state.feature_names
+                        )
+
+                    elif explainability_type == "Feature Impact Analysis":
+                        display_feature_impact_analysis(
+                            st.session_state.model,
+                            st.session_state.X_train,
+                            st.session_state.X_test,
+                            st.session_state.feature_names,
+                            df
+                        )
+            else:
+                st.warning("Please train the model first to access explainability features!")
+                if st.button("Go to Model Training"):
+                    st.experimental_rerun()
+
     elif choice == "Dropout Prediction" or st.session_state.show_prediction:
-        st.markdown("<div style='font-size: 20px; font-weight: bold;'>🔮 Dropout Prediction</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 20px; font-weight: bold;'>🔮 Dropout Prediction</div>",
+                    unsafe_allow_html=True)
         st.markdown("Predict the likelihood of dropout for an individual student.")
+
         if 'model' in st.session_state:
             with st.expander("Prediction Tool", expanded=True):
-                individual_dropout_prediction(st.session_state.model, X)
+                # Modified to include explainability in individual predictions
+                individual_dropout_prediction_with_explanation(
+                    st.session_state.model,
+                    X,
+                    st.session_state.X_train,
+                    st.session_state.feature_names
+                )
         else:
             st.warning("Please train the model first!")
             if st.button("Go to Model Training"):
                 st.session_state.show_prediction = False
                 st.experimental_rerun()
+
 
 if __name__ == "__main__":
     main()
