@@ -781,176 +781,273 @@ def visualize_model_results(model, X_test, y_test):
 
 
 def display_global_feature_importance(model, feature_names):
-    """Display global feature importance using SHAP"""
+    """Display global feature importance using multiple methods"""
     st.markdown("#### 🌍 Global Feature Importance")
-    st.markdown("Understanding which features are most important across all predictions.")
+    st.markdown("Shows which features are most important across all predictions in the dataset.")
+
+    # Method selection
+    importance_method = st.selectbox(
+        "Select Importance Method",
+        ["Built-in Feature Importance", "SHAP Global Importance", "Permutation Importance"]
+    )
 
     try:
-        with st.spinner("Calculating global feature importance..."):
-            # Create SHAP explainer
-            explainer = shap.TreeExplainer(model)
-
-            # Get SHAP values for a sample of the training data
-            # Use a smaller sample for performance
-            sample_size = min(100, len(st.session_state.X_train))
-            X_sample = st.session_state.X_train.sample(n=sample_size, random_state=42)
-
-            shap_values = explainer.shap_values(X_sample)
-
-            # Handle different SHAP value formats
-            if isinstance(shap_values, list):
-                # Multi-class case: shap_values is a list of arrays
-                st.markdown("**Multi-class model detected**")
-
-                # Calculate mean absolute SHAP values for each class
-                class_importance = {}
-                for class_idx, class_shap_values in enumerate(shap_values):
-                    mean_abs_shap = np.mean(np.abs(class_shap_values), axis=0)
-                    class_importance[f'Class_{class_idx}'] = mean_abs_shap
-
-                # Overall importance (mean across all classes)
-                overall_importance = np.mean([np.abs(class_shap) for class_shap in shap_values], axis=(0, 1))
-
-                # Create DataFrame for overall importance
-                importance_df = pd.DataFrame({
-                    'Feature': feature_names,
-                    'Mean_Abs_SHAP': overall_importance
-                }).sort_values('Mean_Abs_SHAP', ascending=False)
-
-                # Display overall importance
-                st.markdown("**🏆 Overall Feature Importance (All Classes)**")
-                col1, col2 = st.columns([2, 1])
-
-                with col1:
-                    fig = px.bar(
-                        importance_df.head(15),
-                        x='Mean_Abs_SHAP',
-                        y='Feature',
-                        orientation='h',
-                        title='Top 15 Most Important Features (Overall)',
-                        color='Mean_Abs_SHAP',
-                        color_continuous_scale='viridis'
-                    )
-                    fig.update_layout(yaxis={'categoryorder': 'total ascending'})
-                    st.plotly_chart(fig, use_container_width=True)
-
-                with col2:
-                    st.markdown("**📊 Top 10 Features:**")
-                    for i, (idx, row) in enumerate(importance_df.head(10).iterrows()):
-                        st.write(f"{i + 1}. **{row['Feature']}**: {row['Mean_Abs_SHAP']:.4f}")
-
-                # Class-specific importance
-                st.markdown("**🎯 Class-Specific Feature Importance**")
-
-                class_tabs = st.tabs([f"Class {i}" for i in range(len(shap_values))])
-
-                for class_idx, tab in enumerate(class_tabs):
-                    with tab:
-                        class_df = pd.DataFrame({
-                            'Feature': feature_names,
-                            'Mean_Abs_SHAP': class_importance[f'Class_{class_idx}']
-                        }).sort_values('Mean_Abs_SHAP', ascending=False)
-
-                        # Readable class names
-                        class_name = "Dropout" if class_idx == 0 else "Graduate" if class_idx == 1 else "Enrolled"
-                        st.markdown(f"**Most Important Features for {class_name} Prediction:**")
-
-                        fig = px.bar(
-                            class_df.head(10),
-                            x='Mean_Abs_SHAP',
-                            y='Feature',
-                            orientation='h',
-                            title=f'Top 10 Features for {class_name}',
-                            color='Mean_Abs_SHAP',
-                            color_continuous_scale='plasma'
-                        )
-                        fig.update_layout(yaxis={'categoryorder': 'total ascending'})
-                        st.plotly_chart(fig, use_container_width=True)
-
-            else:
-                # Binary classification case
-                st.markdown("**Binary classification model detected**")
-
-                # Calculate mean absolute SHAP values
-                mean_abs_shap = np.mean(np.abs(shap_values), axis=0)
-
-                # Create DataFrame
-                importance_df = pd.DataFrame({
-                    'Feature': feature_names,
-                    'Mean_Abs_SHAP': mean_abs_shap
-                }).sort_values('Mean_Abs_SHAP', ascending=False)
-
-                # Display results
-                col1, col2 = st.columns([2, 1])
-
-                with col1:
-                    fig = px.bar(
-                        importance_df.head(15),
-                        x='Mean_Abs_SHAP',
-                        y='Feature',
-                        orientation='h',
-                        title='Top 15 Most Important Features',
-                        color='Mean_Abs_SHAP',
-                        color_continuous_scale='viridis'
-                    )
-                    fig.update_layout(yaxis={'categoryorder': 'total ascending'})
-                    st.plotly_chart(fig, use_container_width=True)
-
-                with col2:
-                    st.markdown("**📊 Top 10 Features:**")
-                    for i, (idx, row) in enumerate(importance_df.head(10).iterrows()):
-                        st.write(f"{i + 1}. **{row['Feature']}**: {row['Mean_Abs_SHAP']:.4f}")
-
-            # SHAP Summary Plot
-            st.markdown("**📈 SHAP Summary Plot**")
-
-            if isinstance(shap_values, list):
-                # For multi-class, show summary for the first class (usually most interesting)
-                fig_summary = plt.figure(figsize=(10, 8))
-                shap.summary_plot(shap_values[0], X_sample, feature_names=feature_names, show=False)
-                st.pyplot(fig_summary)
-                plt.close()
-                st.caption(
-                    "Summary plot for Class 0 (Dropout). Each dot represents a student, color indicates feature value.")
-            else:
-                fig_summary = plt.figure(figsize=(10, 8))
-                shap.summary_plot(shap_values, X_sample, feature_names=feature_names, show=False)
-                st.pyplot(fig_summary)
-                plt.close()
-                st.caption("Each dot represents a student, color indicates feature value.")
-
-            # Insights
-            st.markdown("### 💡 Key Insights")
-            top_3_features = importance_df.head(3)['Feature'].tolist()
-            st.write(f"**Top 3 most important features:** {', '.join(top_3_features)}")
-            st.write("• Higher SHAP values indicate greater impact on model predictions")
-            st.write("• Focus intervention strategies on the most important features")
-            st.write("• Consider collecting more data for less important features that might be noise")
-
-    except Exception as e:
-        st.error(f"Error calculating feature importance: {str(e)}")
-        st.info("This might be due to model compatibility issues. Try retraining the model or check your data format.")
-
-        # Fallback: Show model feature importance if available
-        try:
+        if importance_method == "Built-in Feature Importance":
+            # For tree-based models
             if hasattr(model, 'feature_importances_'):
-                st.markdown("**🔄 Fallback: Model Built-in Feature Importance**")
-                fallback_df = pd.DataFrame({
+                importances = model.feature_importances_
+
+                # Create DataFrame for plotting
+                importance_df = pd.DataFrame({
                     'Feature': feature_names,
-                    'Importance': model.feature_importances_
+                    'Importance': importances
                 }).sort_values('Importance', ascending=False)
 
+                # Plot using plotly for interactivity
                 fig = px.bar(
-                    fallback_df.head(15),
+                    importance_df.head(15),
                     x='Importance',
                     y='Feature',
                     orientation='h',
-                    title='Top 15 Features (Model Built-in Importance)'
+                    title="Top 15 Most Important Features",
+                    color='Importance',
+                    color_continuous_scale='viridis'
                 )
                 fig.update_layout(yaxis={'categoryorder': 'total ascending'})
                 st.plotly_chart(fig, use_container_width=True)
-        except:
-            st.write("Could not display alternative feature importance.")
+
+                # Show top features summary
+                st.markdown("**📊 Top 5 Most Important Features:**")
+                for i, (idx, row) in enumerate(importance_df.head(5).iterrows()):
+                    st.write(f"{i + 1}. **{row['Feature']}**: {row['Importance']:.4f}")
+
+                st.markdown(
+                    "**Insight**: These features have the highest impact on the model's decision-making process globally.")
+
+            else:
+                st.warning("This model doesn't have built-in feature importance. Try SHAP or Permutation Importance.")
+
+        elif importance_method == "SHAP Global Importance":
+            with st.spinner("Calculating SHAP values... This may take a moment."):
+                # Use a sample for SHAP calculation to speed up
+                sample_size = min(100, len(st.session_state.X_train))
+                X_sample = st.session_state.X_train.sample(n=sample_size, random_state=42)
+
+                # Ensure feature_names is the right type and length
+                if hasattr(feature_names, 'tolist'):
+                    feature_names_list = feature_names.tolist()
+                else:
+                    feature_names_list = list(feature_names)
+
+                # CRITICAL FIX: Ensure X_sample and feature_names match
+                if len(feature_names_list) != X_sample.shape[1]:
+                    st.error(
+                        f"Feature names length ({len(feature_names_list)}) doesn't match data columns ({X_sample.shape[1]})")
+                    return
+
+                # Create SHAP explainer
+                explainer = shap.TreeExplainer(model)
+                shap_values = explainer.shap_values(X_sample)
+
+                # Debug information
+                st.write(f"Debug - Feature names length: {len(feature_names_list)}")
+                st.write(f"Debug - X_sample shape: {X_sample.shape}")
+
+                # FIXED: Handle multi-class SHAP values properly
+                if isinstance(shap_values, list):
+                    # Multi-class case: shap_values is a list of arrays
+                    st.write(f"Debug - Number of classes: {len(shap_values)}")
+                    st.write(f"Debug - SHAP values shape per class: {shap_values[0].shape}")
+
+                    # FIXED: Calculate mean absolute SHAP values properly
+                    # Each element in shap_values is shape (n_samples, n_features)
+
+                    # Method: Average absolute SHAP values across samples for each class, then across classes
+                    class_importances = []
+                    for class_shap in shap_values:
+                        # Take mean absolute SHAP value across samples for this class
+                        class_importance = np.abs(class_shap).mean(axis=0)  # Shape: (n_features,)
+                        class_importances.append(class_importance)
+
+                    # Stack class importances and average across classes
+                    class_importances = np.array(class_importances)  # Shape: (n_classes, n_features)
+                    mean_shap = np.mean(class_importances, axis=0)  # Shape: (n_features,)
+
+                    # Use the first class for detailed plotting
+                    shap_values_plot = shap_values[0]
+
+                elif shap_values.ndim == 3:
+                    # Alternative multi-class format: shape (n_samples, n_features, n_classes)
+                    st.write(f"Debug - SHAP values shape (3D): {shap_values.shape}")
+
+                    # Take mean absolute SHAP values across samples, then across classes
+                    # shap_values shape: (n_samples, n_features, n_classes)
+                    mean_abs_shap_per_class = np.abs(shap_values).mean(axis=0)  # Shape: (n_features, n_classes)
+                    mean_shap = np.mean(mean_abs_shap_per_class, axis=1)  # Shape: (n_features,)
+
+                    # Use the first class for plotting (convert to list format for compatibility)
+                    shap_values_plot = shap_values[:, :, 0]  # Shape: (n_samples, n_features)
+
+                else:
+                    # Binary classification case
+                    st.write(f"Debug - SHAP values shape: {shap_values.shape}")
+                    shap_values_plot = shap_values
+                    mean_shap = np.abs(shap_values).mean(axis=0)
+
+                # Ensure mean_shap is 1-dimensional and matches feature count
+                if mean_shap.ndim > 1:
+                    mean_shap = mean_shap.flatten()
+
+                st.write(f"Debug - Mean SHAP shape: {mean_shap.shape}")
+                st.write(f"Debug - Expected features: {len(feature_names_list)}")
+
+                # FINAL CHECK: Ensure lengths match
+                if len(feature_names_list) != len(mean_shap):
+                    st.error(
+                        f"FINAL CHECK - Length mismatch: {len(feature_names_list)} features vs {len(mean_shap)} SHAP values")
+                    st.error("This suggests a fundamental issue with the data preprocessing or model training.")
+                    return
+
+                # Create DataFrame
+                shap_df = pd.DataFrame({
+                    'Feature': feature_names_list,
+                    'Mean_SHAP_Value': mean_shap
+                }).sort_values('Mean_SHAP_Value', ascending=False)
+
+                # Plot
+                fig = px.bar(
+                    shap_df.head(15),
+                    x='Mean_SHAP_Value',
+                    y='Feature',
+                    orientation='h',
+                    title="SHAP Feature Importance (Mean Absolute SHAP Values)",
+                    color='Mean_SHAP_Value',
+                    color_continuous_scale='plasma'
+                )
+                fig.update_layout(yaxis={'categoryorder': 'total ascending'})
+                st.plotly_chart(fig, use_container_width=True)
+
+                # Show top features summary
+                st.markdown("**📊 Top 5 Most Important Features (SHAP):**")
+                for i, (idx, row) in enumerate(shap_df.head(5).iterrows()):
+                    st.write(f"{i + 1}. **{row['Feature']}**: {row['Mean_SHAP_Value']:.4f}")
+
+                # SHAP Summary Plot - FIXED
+                st.markdown("**🎯 SHAP Summary Plot**")
+                try:
+                    # Create figure with proper size
+                    fig_shap, ax = plt.subplots(figsize=(12, 8))
+
+                    # Ensure feature names are numpy array
+                    feature_names_array = np.array(feature_names_list)
+
+                    # FIXED: Use correct parameters for summary plot
+                    shap.summary_plot(
+                        shap_values_plot,  # Shape: (n_samples, n_features)
+                        X_sample,  # Shape: (n_samples, n_features)
+                        feature_names=feature_names_array,
+                        show=False,
+                        max_display=15,
+                        plot_size=(12, 8)
+                    )
+
+                    if isinstance(shap_values, list) or shap_values.ndim == 3:
+                        st.markdown(
+                            "*Note: Summary plot shows SHAP values for the first class (typically dropout risk)*")
+
+                    # Display the plot
+                    st.pyplot(fig_shap, clear_figure=True)
+
+                    st.markdown(
+                        "**Insight**: SHAP values show both the magnitude and direction of feature impact. "
+                        "Red dots indicate higher feature values, blue dots indicate lower values.")
+
+                except Exception as plot_error:
+                    st.warning(f"Could not generate SHAP summary plot: {str(plot_error)}")
+                    st.info("The feature importance values above are still valid.")
+
+                    # Additional debugging information
+                    st.write("Debug info for summary plot:")
+                    st.write(f"- shap_values_plot shape: {shap_values_plot.shape}")
+                    st.write(f"- X_sample shape: {X_sample.shape}")
+                    st.write(f"- feature_names_array length: {len(feature_names_array)}")
+
+                    # Try alternative visualization
+                    st.markdown("**Alternative: Top Feature Contributions**")
+                    try:
+                        # Create a simple bar plot of mean absolute SHAP values
+                        top_features = shap_df.head(10)
+                        fig_alt = px.bar(
+                            top_features,
+                            x='Mean_SHAP_Value',
+                            y='Feature',
+                            orientation='h',
+                            title="Top 10 Feature Contributions (SHAP)",
+                            color='Mean_SHAP_Value',
+                            color_continuous_scale='RdYlBu_r'
+                        )
+                        fig_alt.update_layout(yaxis={'categoryorder': 'total ascending'})
+                        st.plotly_chart(fig_alt, use_container_width=True)
+                    except Exception as alt_error:
+                        st.error(f"Alternative visualization also failed: {str(alt_error)}")
+
+        elif importance_method == "Permutation Importance":
+            with st.spinner("Calculating permutation importance..."):
+                # Calculate permutation importance
+                perm_importance = permutation_importance(
+                    model,
+                    st.session_state.X_test,
+                    st.session_state.y_test,
+                    n_repeats=5,
+                    random_state=42
+                )
+
+                # Create DataFrame
+                perm_df = pd.DataFrame({
+                    'Feature': feature_names,
+                    'Importance': perm_importance.importances_mean,
+                    'Std': perm_importance.importances_std
+                }).sort_values('Importance', ascending=False)
+
+                # Plot with error bars
+                fig = px.bar(
+                    perm_df.head(15),
+                    x='Importance',
+                    y='Feature',
+                    orientation='h',
+                    error_x='Std',
+                    title="Permutation Feature Importance",
+                    color='Importance',
+                    color_continuous_scale='cividis'
+                )
+                fig.update_layout(yaxis={'categoryorder': 'total ascending'})
+                st.plotly_chart(fig, use_container_width=True)
+
+                # Show top features summary
+                st.markdown("**📊 Top 5 Most Important Features (Permutation):**")
+                for i, (idx, row) in enumerate(perm_df.head(5).iterrows()):
+                    st.write(f"{i + 1}. **{row['Feature']}**: {row['Importance']:.4f} (±{row['Std']:.4f})")
+
+                st.markdown(
+                    "**Insight**: Permutation importance shows how much model performance decreases when each feature is randomly shuffled.")
+
+    except Exception as e:
+        st.error(f"Error calculating feature importance: {str(e)}")
+        st.info("This might happen with certain model types. Try a different importance method.")
+
+        # Add debugging information
+        if importance_method == "SHAP Global Importance":
+            st.info(
+                "SHAP errors often occur with multi-class models. The built-in feature importance or permutation importance methods should work reliably.")
+
+            # Additional debugging
+            st.write("**Debug Information:**")
+            if 'X_train' in st.session_state:
+                st.write(f"- X_train shape: {st.session_state.X_train.shape}")
+            if 'feature_names' in locals():
+                st.write(f"- Feature names length: {len(feature_names)}")
+            st.write(f"- Model type: {type(model).__name__}")
+
 
 def display_local_explanation(model, X_train, X_test, feature_names):
     """Display local explanations for individual predictions"""
@@ -1005,38 +1102,97 @@ def display_local_explanation(model, X_train, X_test, feature_names):
                 explainer = shap.TreeExplainer(model)
                 shap_values = explainer.shap_values(student_data)
 
-                # Handle multi-class output
+                # Debug information
+                st.write(f"Debug - SHAP values type: {type(shap_values)}")
                 if isinstance(shap_values, list):
+                    st.write(f"Debug - Number of classes: {len(shap_values)}")
+                    st.write(f"Debug - SHAP values shape per class: {shap_values[0].shape}")
+                elif hasattr(shap_values, 'shape'):
+                    st.write(f"Debug - SHAP values shape: {shap_values.shape}")
+
+                # Handle different SHAP value formats
+                if isinstance(shap_values, list):
+                    # Multi-class case: shap_values is a list of arrays
                     shap_values_for_prediction = shap_values[prediction]  # Use predicted class
+                    expected_value = explainer.expected_value[prediction] if isinstance(explainer.expected_value,
+                                                                                        np.ndarray) else explainer.expected_value
+                elif shap_values.ndim == 3:
+                    # Alternative multi-class format: shape (n_samples, n_features, n_classes)
+                    shap_values_for_prediction = shap_values[0, :, prediction]  # First sample, predicted class
+                    expected_value = explainer.expected_value[prediction] if isinstance(explainer.expected_value,
+                                                                                        np.ndarray) else explainer.expected_value
                 else:
-                    shap_values_for_prediction = shap_values
+                    # Binary classification case
+                    shap_values_for_prediction = shap_values[0]  # First (and only) sample
+                    expected_value = explainer.expected_value
+
+                # Ensure we have the right shape for a single prediction
+                if shap_values_for_prediction.ndim > 1:
+                    shap_values_for_prediction = shap_values_for_prediction.flatten()
+
+                st.write(f"Debug - Final SHAP values shape: {shap_values_for_prediction.shape}")
+                st.write(f"Debug - Expected value: {expected_value}")
+                st.write(f"Debug - Feature names length: {len(feature_names)}")
 
                 # SHAP waterfall plot - FIXED VERSION
                 st.markdown("**🌊 SHAP Waterfall Plot**")
 
-                # Create the explanation object properly
-                if isinstance(explainer.expected_value, np.ndarray):
-                    base_value = explainer.expected_value[prediction]
-                else:
-                    base_value = explainer.expected_value
+                try:
+                    # Create the explanation object properly for waterfall plot
+                    shap_explanation = shap.Explanation(
+                        values=shap_values_for_prediction,  # 1D array of SHAP values
+                        base_values=expected_value,  # Scalar base value
+                        data=student_data.iloc[0].values,  # 1D array of feature values
+                        feature_names=list(feature_names)  # List of feature names
+                    )
 
-                shap_explanation = shap.Explanation(
-                    values=shap_values_for_prediction[0],  # Single instance SHAP values
-                    base_values=base_value,
-                    data=student_data.iloc[0].values,
-                    feature_names=feature_names
-                )
+                    # Create waterfall plot
+                    fig_waterfall = plt.figure(figsize=(12, 8))
+                    shap.plots.waterfall(shap_explanation, show=False, max_display=15)
+                    st.pyplot(fig_waterfall, clear_figure=True)
 
-                # Use the newer shap.plots.waterfall function
-                fig_waterfall = plt.figure(figsize=(10, 8))
-                shap.plots.waterfall(shap_explanation, show=False)
-                st.pyplot(fig_waterfall)
-                plt.close()
+                    st.markdown(f"*Note: Waterfall plot shows SHAP values for predicted class: {readable_prediction}*")
 
-                # Top contributing features
+                except Exception as waterfall_error:
+                    st.warning(f"Could not generate waterfall plot: {str(waterfall_error)}")
+                    st.info("Showing alternative visualization instead.")
+
+                    # Alternative: Horizontal bar chart of SHAP values
+                    st.markdown("**📊 Feature Contributions (Alternative View)**")
+
+                    # Create DataFrame for plotting
+                    shap_df_alt = pd.DataFrame({
+                        'Feature': feature_names,
+                        'SHAP_Value': shap_values_for_prediction,
+                        'Feature_Value': student_data.iloc[0].values
+                    })
+
+                    # Sort by absolute SHAP value
+                    shap_df_alt['Abs_SHAP'] = np.abs(shap_df_alt['SHAP_Value'])
+                    shap_df_alt = shap_df_alt.sort_values('Abs_SHAP', ascending=False).head(15)
+
+                    # Create horizontal bar plot
+                    fig_alt = px.bar(
+                        shap_df_alt,
+                        x='SHAP_Value',
+                        y='Feature',
+                        orientation='h',
+                        color='SHAP_Value',
+                        color_continuous_scale=['red', 'white', 'blue'],
+                        color_continuous_midpoint=0,
+                        title=f"SHAP Feature Contributions for {readable_prediction} Prediction",
+                        hover_data=['Feature_Value']
+                    )
+                    fig_alt.update_layout(
+                        yaxis={'categoryorder': 'total ascending'},
+                        height=600
+                    )
+                    st.plotly_chart(fig_alt, use_container_width=True)
+
+                # Top contributing features analysis
                 shap_importance = pd.DataFrame({
                     'Feature': feature_names,
-                    'SHAP_Value': shap_values_for_prediction[0],
+                    'SHAP_Value': shap_values_for_prediction,
                     'Feature_Value': student_data.iloc[0].values
                 })
                 shap_importance['Abs_SHAP'] = np.abs(shap_importance['SHAP_Value'])
@@ -1045,8 +1201,23 @@ def display_local_explanation(model, X_train, X_test, feature_names):
                 st.markdown("**🎯 Top Contributing Features:**")
                 for i, (idx, row) in enumerate(shap_importance.head(5).iterrows()):
                     impact = "increases" if row['SHAP_Value'] > 0 else "decreases"
+                    impact_color = "🔴" if row['SHAP_Value'] > 0 else "🟢"
                     st.write(
-                        f"{i + 1}. **{row['Feature']}** (value: {row['Feature_Value']:.2f}) {impact} prediction by {abs(row['SHAP_Value']):.4f}")
+                        f"{i + 1}. {impact_color} **{row['Feature']}** (value: {row['Feature_Value']:.2f}) "
+                        f"{impact} {readable_prediction.lower()} probability by {abs(row['SHAP_Value']):.4f}"
+                    )
+
+                # Summary insight
+                st.markdown("**💡 Key Insights:**")
+                positive_features = shap_importance[shap_importance['SHAP_Value'] > 0]
+                negative_features = shap_importance[shap_importance['SHAP_Value'] < 0]
+
+                if len(positive_features) > 0:
+                    st.write(
+                        f"• **Risk factors**: {len(positive_features)} features increase {readable_prediction.lower()} probability")
+                if len(negative_features) > 0:
+                    st.write(
+                        f"• **Protective factors**: {len(negative_features)} features decrease {readable_prediction.lower()} probability")
 
         elif explanation_method == "LIME Explanation":
             with st.spinner("Generating LIME explanation..."):
@@ -1062,25 +1233,48 @@ def display_local_explanation(model, X_train, X_test, feature_names):
                 explanation = explainer.explain_instance(
                     student_data.iloc[0].values,
                     model.predict_proba,
-                    num_features=10
+                    num_features=15
                 )
 
                 # Display LIME plot
                 st.markdown("**🍃 LIME Explanation**")
                 fig_lime = explanation.as_pyplot_figure()
-                st.pyplot(fig_lime)
-                plt.close()
+                fig_lime.set_size_inches(12, 8)
+                st.pyplot(fig_lime, clear_figure=True)
 
                 # Extract and display feature contributions
                 lime_values = explanation.as_list()
                 st.markdown("**📋 LIME Feature Contributions:**")
-                for i, (feature_desc, contribution) in enumerate(lime_values[:5]):
+                for i, (feature_desc, contribution) in enumerate(lime_values[:8]):
                     impact = "supports" if contribution > 0 else "opposes"
-                    st.write(f"{i + 1}. {feature_desc} {impact} the prediction (weight: {contribution:.4f})")
+                    impact_color = "🔴" if contribution > 0 else "🟢"
+                    st.write(
+                        f"{i + 1}. {impact_color} {feature_desc} {impact} the prediction (weight: {contribution:.4f})")
+
+                # LIME explanation summary
+                st.markdown("**💡 LIME Insights:**")
+                st.write(f"• LIME shows local feature importance around this specific prediction")
+                st.write(f"• Positive weights support the predicted class, negative weights oppose it")
 
     except Exception as e:
         st.error(f"Error generating explanation: {str(e)}")
         st.info("Try selecting a different student or explanation method.")
+
+        # Additional debugging information
+        st.write("**Debug Information:**")
+        st.write(f"- Student data shape: {student_data.shape}")
+        st.write(f"- Prediction: {prediction}")
+        st.write(f"- Prediction probabilities: {prediction_proba}")
+        st.write(f"- Feature names length: {len(feature_names)}")
+        st.write(f"- Model type: {type(model).__name__}")
+
+        if 'shap_values' in locals():
+            st.write(f"- SHAP values type: {type(shap_values)}")
+            if isinstance(shap_values, list):
+                st.write(f"- SHAP values list length: {len(shap_values)}")
+                st.write(f"- First element shape: {shap_values[0].shape}")
+            elif hasattr(shap_values, 'shape'):
+                st.write(f"- SHAP values shape: {shap_values.shape}")
 
 def display_feature_impact_analysis(model, X_train, X_test, feature_names, df):
     """Display how different feature values impact predictions"""
