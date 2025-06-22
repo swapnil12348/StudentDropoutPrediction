@@ -6,3 +6,5 @@ matplotlib>=3.6.0
 seaborn>=0.12.0
 streamlit>=1.10.0
 plotly>=5.10.0
+shap>=0.41.0
+lime>=0.2.0
