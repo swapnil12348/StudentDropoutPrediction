@@ -1361,7 +1361,6 @@ def display_feature_impact_analysis(model, X_train, X_test, feature_names, df):
                 st.write(f"**Medium Risk Zone**: {low_risk_threshold:.2f} - {high_risk_threshold:.2f}")
                 st.write(f"**Low Risk Zone**: < {low_risk_threshold:.2f}")
 
-
 def individual_dropout_prediction_with_explanation(model, X, X_train, feature_names):
     """Enhanced individual prediction with explanations"""
     st.markdown("#### 🎯 Individual Student Prediction with Explanation")
@@ -1373,7 +1372,11 @@ def individual_dropout_prediction_with_explanation(model, X, X_train, feature_na
     col1, col2 = st.columns(2)
 
     input_data = {}
-    feature_list = feature_names.tolist()
+    # Fix: Handle both list and pandas Index/Series cases
+    if hasattr(feature_names, 'tolist'):
+        feature_list = feature_names.tolist()
+    else:
+        feature_list = list(feature_names)  # Already a list or convert to list
 
     # Split features into two columns
     mid_point = len(feature_list) // 2
@@ -1462,7 +1465,7 @@ def individual_dropout_prediction_with_explanation(model, X, X_train, feature_na
 
                 # Feature contributions
                 feature_contrib = pd.DataFrame({
-                    'Feature': feature_names,
+                    'Feature': feature_list,  # Use feature_list instead of feature_names
                     'Value': input_df.iloc[0].values,
                     'SHAP_Value': shap_values_single[0]
                 })
@@ -1516,7 +1519,6 @@ def individual_dropout_prediction_with_explanation(model, X, X_train, feature_na
         except Exception as e:
             st.error(f"Could not generate explanation: {str(e)}")
             st.info("Prediction completed, but explanation feature is unavailable.")
-
 
 def main():
     st.markdown("<div style='font-size: 24px; font-weight: bold;'>🎓 Student Dropout Prediction Dashboard</div>",
