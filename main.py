@@ -779,7 +779,6 @@ def visualize_model_results(model, X_test, y_test):
             st.markdown("**Insight**: Features like first-semester grades and units approved are critical drivers of the model's predictions.", unsafe_allow_html=True)
             plt.close()
 
-
 def display_global_feature_importance(model, feature_names):
     """Display global feature importance using multiple methods"""
     st.markdown("#### 🌍 Global Feature Importance")
@@ -1047,7 +1046,6 @@ def display_global_feature_importance(model, feature_names):
             if 'feature_names' in locals():
                 st.write(f"- Feature names length: {len(feature_names)}")
             st.write(f"- Model type: {type(model).__name__}")
-
 
 def display_local_explanation(model, X_train, X_test, feature_names):
     """Display local explanations for individual predictions"""
@@ -1362,7 +1360,7 @@ def display_feature_impact_analysis(model, X_train, X_test, feature_names, df):
                 st.write(f"**Low Risk Zone**: < {low_risk_threshold:.2f}")
 
 def individual_dropout_prediction_with_explanation(model, X, X_train, feature_names):
-    """Enhanced individual prediction with explanations"""
+    """Enhanced individual prediction with explanations - FIXED VERSION"""
     st.markdown("#### 🎯 Individual Student Prediction with Explanation")
 
     # Create input form for student data
@@ -1388,13 +1386,16 @@ def individual_dropout_prediction_with_explanation(model, X, X_train, feature_na
                 max_val = float(X[feature].max())
                 mean_val = float(X[feature].mean())
 
-                input_data[feature] = st.number_input(
+                # FIXED: Ensure scalar values are stored, not arrays
+                input_value = st.number_input(
                     f"{feature}",
                     min_value=min_val,
                     max_value=max_val,
                     value=mean_val,
                     key=f"input_{feature}"
                 )
+                # Convert to Python scalar to avoid numpy array issues
+                input_data[feature] = float(input_value)
 
     with col2:
         for feature in feature_list[mid_point:]:
@@ -1403,122 +1404,199 @@ def individual_dropout_prediction_with_explanation(model, X, X_train, feature_na
                 max_val = float(X[feature].max())
                 mean_val = float(X[feature].mean())
 
-                input_data[feature] = st.number_input(
+                # FIXED: Ensure scalar values are stored, not arrays
+                input_value = st.number_input(
                     f"{feature}",
                     min_value=min_val,
                     max_value=max_val,
                     value=mean_val,
                     key=f"input_{feature}"
                 )
+                # Convert to Python scalar to avoid numpy array issues
+                input_data[feature] = float(input_value)
 
     if st.button("🔮 Predict with Explanation", type="primary"):
-        # Create DataFrame from input
-        input_df = pd.DataFrame([input_data])
-
-        # Make prediction
-        prediction = model.predict(input_df)[0]
-        prediction_proba = model.predict_proba(input_df)[0]
-
-        # Display results
-        st.markdown("---")
-        st.markdown("### 📊 Prediction Results")
-
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            readable_prediction = "Dropout" if prediction == 0 else "Graduate" if prediction == 1 else "Enrolled"
-            st.metric("🎯 Prediction", readable_prediction)
-
-        with col2:
-            confidence = np.max(prediction_proba)
-            st.metric("🎯 Confidence", f"{confidence:.1%}")
-
-        with col3:
-            risk_level = "High" if prediction == 0 else "Low"
-            st.metric("⚠️ Risk Level", risk_level)
-
-        # Probability breakdown
-        st.markdown("**📊 Detailed Probabilities:**")
-        prob_data = {
-            'Outcome': ['Dropout', 'Graduate', 'Enrolled'][:len(prediction_proba)],
-            'Probability': prediction_proba
-        }
-        prob_df = pd.DataFrame(prob_data)
-
-        fig = px.bar(prob_df, x='Outcome', y='Probability',
-                     color='Probability', color_continuous_scale='RdYlGn_r',
-                     title="Prediction Probabilities")
-        st.plotly_chart(fig, use_container_width=True)
-
-        # Generate explanation
         try:
-            st.markdown("### 🔍 Why This Prediction?")
-
-            with st.spinner("Generating explanation..."):
-                # SHAP explanation
-                explainer = shap.TreeExplainer(model)
-                shap_values = explainer.shap_values(input_df)
-
-                if isinstance(shap_values, list):
-                    shap_values_single = shap_values[prediction]
+            # FIXED: Create DataFrame more carefully
+            # Ensure all values are scalars and in the correct order
+            ordered_data = {}
+            for feature in feature_list:
+                if feature in input_data:
+                    # Ensure it's a scalar value
+                    value = input_data[feature]
+                    if hasattr(value, 'item'):  # If it's a numpy scalar
+                        value = value.item()
+                    ordered_data[feature] = value
                 else:
-                    shap_values_single = shap_values
+                    # If feature is missing, use mean from training data
+                    ordered_data[feature] = float(X[feature].mean())
 
-                # Feature contributions
-                feature_contrib = pd.DataFrame({
-                    'Feature': feature_list,  # Use feature_list instead of feature_names
-                    'Value': input_df.iloc[0].values,
-                    'SHAP_Value': shap_values_single[0]
-                })
-                feature_contrib['Abs_SHAP'] = np.abs(feature_contrib['SHAP_Value'])
-                feature_contrib = feature_contrib.sort_values('Abs_SHAP', ascending=False)
+            # Create DataFrame with explicit scalar values
+            input_df = pd.DataFrame([ordered_data])
 
-                # Display top contributing features
-                st.markdown("**🎯 Top Factors Influencing This Prediction:**")
+            # Verify DataFrame shape and contents
+            st.write(f"Debug - Input DataFrame shape: {input_df.shape}")
+            st.write(f"Debug - Expected features: {len(feature_list)}")
+            st.write(f"Debug - DataFrame columns: {len(input_df.columns)}")
 
-                for i, (idx, row) in enumerate(feature_contrib.head(5).iterrows()):
-                    impact = "increases" if row['SHAP_Value'] > 0 else "decreases"
-                    color = "🔴" if row['SHAP_Value'] > 0 else "🟢"
+            # Ensure column order matches training data
+            input_df = input_df.reindex(columns=feature_list, fill_value=0)
 
-                    st.write(f"{i + 1}. {color} **{row['Feature']}** (value: {row['Value']:.2f}) "
-                             f"{impact} dropout risk by {abs(row['SHAP_Value']):.4f}")
+            # Make prediction
+            prediction = model.predict(input_df)[0]
+            prediction_proba = model.predict_proba(input_df)[0]
 
-                # Visualization of feature contributions
-                top_features = feature_contrib.head(10)
-                fig = px.bar(top_features, x='SHAP_Value', y='Feature',
-                             orientation='h', color='SHAP_Value',
-                             color_continuous_scale='RdBu_r',
-                             title="Feature Contributions to Prediction")
-                fig.update_layout(yaxis={'categoryorder': 'total ascending'})
-                st.plotly_chart(fig, use_container_width=True)
+            # Display results
+            st.markdown("---")
+            st.markdown("### 📊 Prediction Results")
 
-                # Recommendations
-                st.markdown("### 💡 Recommendations")
-                if prediction == 0:  # Dropout prediction
-                    st.warning("**High Dropout Risk Detected!**")
-                    st.markdown("**Recommended Interventions:**")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                readable_prediction = "Dropout" if prediction == 0 else "Graduate" if prediction == 1 else "Enrolled"
+                st.metric("🎯 Prediction", readable_prediction)
 
-                    # Find features that increase dropout risk
-                    risk_factors = feature_contrib[feature_contrib['SHAP_Value'] > 0].head(3)
-                    for idx, row in risk_factors.iterrows():
-                        st.write(f"• Address **{row['Feature']}** - current value: {row['Value']:.2f}")
+            with col2:
+                confidence = np.max(prediction_proba)
+                st.metric("🎯 Confidence", f"{confidence:.1%}")
 
-                    st.markdown("**Support Strategies:**")
-                    st.write("• Academic counseling and tutoring")
-                    st.write("• Financial aid consultation")
-                    st.write("• Student engagement programs")
-                    st.write("• Regular progress monitoring")
+            with col3:
+                risk_level = "High" if prediction == 0 else "Low"
+                st.metric("⚠️ Risk Level", risk_level)
 
-                else:  # Graduate/Enrolled prediction
-                    st.success("**Low Dropout Risk - Student on Track!**")
-                    st.markdown("**Maintain Success Factors:**")
+            # Probability breakdown
+            st.markdown("**📊 Detailed Probabilities:**")
+            prob_data = {
+                'Outcome': ['Dropout', 'Graduate', 'Enrolled'][:len(prediction_proba)],
+                'Probability': prediction_proba
+            }
+            prob_df = pd.DataFrame(prob_data)
 
-                    protective_factors = feature_contrib[feature_contrib['SHAP_Value'] < 0].head(3)
-                    for idx, row in protective_factors.iterrows():
-                        st.write(f"• Continue supporting **{row['Feature']}** - current value: {row['Value']:.2f}")
+            fig = px.bar(prob_df, x='Outcome', y='Probability',
+                         color='Probability', color_continuous_scale='RdYlGn_r',
+                         title="Prediction Probabilities")
+            st.plotly_chart(fig, use_container_width=True)
+
+            # Generate explanation
+            try:
+                st.markdown("### 🔍 Why This Prediction?")
+
+                with st.spinner("Generating explanation..."):
+                    # SHAP explanation with better error handling
+                    explainer = shap.TreeExplainer(model)
+
+                    # FIXED: Ensure input is in the correct format for SHAP
+                    # Convert DataFrame to numpy array if needed
+                    input_array = input_df.values
+                    st.write(f"Debug - Input array shape for SHAP: {input_array.shape}")
+
+                    shap_values = explainer.shap_values(input_df)
+
+                    # Handle different SHAP value formats
+                    if isinstance(shap_values, list):
+                        # Multi-class case
+                        st.write(f"Debug - Multi-class SHAP values, using class {prediction}")
+                        shap_values_single = shap_values[prediction]
+                    elif shap_values.ndim == 3:
+                        # 3D array format
+                        st.write(f"Debug - 3D SHAP values, extracting class {prediction}")
+                        shap_values_single = shap_values[0, :, prediction]
+                    else:
+                        # Binary classification or 2D array
+                        st.write(f"Debug - 2D SHAP values")
+                        shap_values_single = shap_values[0] if shap_values.ndim > 1 else shap_values
+
+                    # Ensure shap_values_single is 1D
+                    if hasattr(shap_values_single, 'ndim') and shap_values_single.ndim > 1:
+                        shap_values_single = shap_values_single.flatten()
+
+                    st.write(f"Debug - Final SHAP values shape: {shap_values_single.shape}")
+                    st.write(f"Debug - Input values shape: {input_df.iloc[0].values.shape}")
+
+                    # FIXED: Create feature contributions DataFrame more carefully
+                    feature_contrib = pd.DataFrame({
+                        'Feature': feature_list,
+                        'Value': input_df.iloc[0].values.flatten(),  # Ensure 1D
+                        'SHAP_Value': shap_values_single.flatten()  # Ensure 1D
+                    })
+
+                    feature_contrib['Abs_SHAP'] = np.abs(feature_contrib['SHAP_Value'])
+                    feature_contrib = feature_contrib.sort_values('Abs_SHAP', ascending=False)
+
+                    # Display top contributing features
+                    st.markdown("**🎯 Top Factors Influencing This Prediction:**")
+
+                    for i, (idx, row) in enumerate(feature_contrib.head(5).iterrows()):
+                        impact = "increases" if row['SHAP_Value'] > 0 else "decreases"
+                        color = "🔴" if row['SHAP_Value'] > 0 else "🟢"
+
+                        st.write(f"{i + 1}. {color} **{row['Feature']}** (value: {row['Value']:.2f}) "
+                                 f"{impact} dropout risk by {abs(row['SHAP_Value']):.4f}")
+
+                    # Visualization of feature contributions
+                    top_features = feature_contrib.head(10)
+                    fig = px.bar(top_features, x='SHAP_Value', y='Feature',
+                                 orientation='h', color='SHAP_Value',
+                                 color_continuous_scale='RdBu_r',
+                                 title="Feature Contributions to Prediction")
+                    fig.update_layout(yaxis={'categoryorder': 'total ascending'})
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # Recommendations
+                    st.markdown("### 💡 Recommendations")
+                    if prediction == 0:  # Dropout prediction
+                        st.warning("**High Dropout Risk Detected!**")
+                        st.markdown("**Recommended Interventions:**")
+
+                        # Find features that increase dropout risk
+                        risk_factors = feature_contrib[feature_contrib['SHAP_Value'] > 0].head(3)
+                        for idx, row in risk_factors.iterrows():
+                            st.write(f"• Address **{row['Feature']}** - current value: {row['Value']:.2f}")
+
+                        st.markdown("**Support Strategies:**")
+                        st.write("• Academic counseling and tutoring")
+                        st.write("• Financial aid consultation")
+                        st.write("• Student engagement programs")
+                        st.write("• Regular progress monitoring")
+
+                    else:  # Graduate/Enrolled prediction
+                        st.success("**Low Dropout Risk - Student on Track!**")
+                        st.markdown("**Maintain Success Factors:**")
+
+                        protective_factors = feature_contrib[feature_contrib['SHAP_Value'] < 0].head(3)
+                        for idx, row in protective_factors.iterrows():
+                            st.write(f"• Continue supporting **{row['Feature']}** - current value: {row['Value']:.2f}")
+
+            except Exception as e:
+                st.error(f"Could not generate explanation: {str(e)}")
+                st.info("Prediction completed, but explanation feature is unavailable.")
+
+                # Additional debugging information
+                st.write("**Debug Information:**")
+                st.write(f"- Input DataFrame shape: {input_df.shape}")
+                st.write(f"- Input DataFrame dtypes: {input_df.dtypes.tolist()}")
+                st.write(f"- Prediction: {prediction}")
+                st.write(f"- Prediction probabilities: {prediction_proba}")
+                st.write(f"- Feature names length: {len(feature_list)}")
+                st.write(f"- Model type: {type(model).__name__}")
+
+                # Check for any array-like values in input_data
+                st.write("**Input Data Analysis:**")
+                for key, value in input_data.items():
+                    st.write(f"- {key}: {type(value)} = {value}")
 
         except Exception as e:
-            st.error(f"Could not generate explanation: {str(e)}")
-            st.info("Prediction completed, but explanation feature is unavailable.")
+            st.error(f"Error in prediction process: {str(e)}")
+            st.write("**Debug Information:**")
+            st.write(f"- Input data keys: {list(input_data.keys())}")
+            st.write(f"- Expected features: {feature_list}")
+            st.write(f"- Input data types: {[type(v) for v in input_data.values()]}")
+
+            # Try to identify problematic values
+            for key, value in input_data.items():
+                if hasattr(value, 'shape'):
+                    st.write(f"- {key} has shape: {value.shape} (this might be the problem)")
+                elif hasattr(value, '__len__') and not isinstance(value, str):
+                    st.write(f"- {key} has length: {len(value)} (this might be the problem)")
 
 def main():
     st.markdown("<div style='font-size: 24px; font-weight: bold;'>🎓 Student Dropout Prediction Dashboard</div>",
